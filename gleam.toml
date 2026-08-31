@@ -1,0 +1,25 @@
+name = "giolt_sdk"
+version = "1.0.0"
+
+internal_modules = ["giolt/internal"]
+description = ""
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "withgiolt", repo = "giolt_sdk" }
+links = [{ title = "Website", href = "https://giolt.com" }]
+
+[dependencies]
+gleam_stdlib = ">= 1.0.0 and < 2.0.0"
+lustre = ">= 5.7.1 and < 6.0.0"
+lustre_ssg = { git = "https://github.com/withgiolt/lustre_ssg", ref = "55748a9" }
+esgleam = { git = "https://github.com/withgiolt/esgleam", ref = "4b7e36d"}
+simplifile = ">= 2.7.0 and < 3.0.0"
+glailglind = ">= 2.3.0 and < 3.0.0"
+gleam_http = ">= 4.3.0 and < 5.0.0"
+envie = ">= 1.2.0 and < 2.0.0"
+glen = ">= 2.2.3 and < 3.0.0"
+gleam_javascript = ">= 1.0.1 and < 2.0.0"
+filepath = ">= 1.1.2 and < 2.0.0"
+tom = ">= 2.1.0 and < 3.0.0"
+
+[dev_dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"

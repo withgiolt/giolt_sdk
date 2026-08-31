@@ -1,0 +1,8 @@
+name = "islands"
+version = "1.0.0"
+target = "javascript"
+[dependencies]
+gleam_stdlib = ">= 1.0.0 and < 2.0.0"
+lustre = ">= 5.7.1 and < 6.0.0"
+plinth = ">= 0.11.0 and < 1.0.0"
+giolt_sdk = { path = "../.." }
