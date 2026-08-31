@@ -1,7 +1,7 @@
 import envie
 import esgleam
+import giolt/internal/io
 import giolt/internal/project
-import gleam/io
 import gleam/result
 import gleam/string
 import shellout
@@ -30,19 +30,16 @@ pub fn build(target: BuildTarget) {
   let res = do_build(target)
 
   case res {
-    Ok(_) -> io.println("[GioltSDK Bundle] JavaScript bundled successfully")
+    Ok(_) -> io.println_success("JavaScript bundled successfully")
     Error(err) ->
       case err {
         FailedToBuildProjectWithTarget ->
-          io.println("[GioltSDK Bundle] Failed to build project for target")
-        CannotBuild ->
-          io.println("[GioltSDK Bundle] Failed to build bundle with esbuild")
+          io.println_error("Failed to build project for target")
+        CannotBuild -> io.println_error("Failed to build bundle with esbuild")
         CannotLoadProject(_) ->
-          io.println("[GioltSDK Bundle] Failed to load project properties")
+          io.println_error("Failed to load project properties")
         CannotCreateBuildFolder(_) ->
-          io.println(
-            "[GioltSDK Bundle] Failed to create temporary build assets",
-          )
+          io.println_error("Failed to create temporary build assets")
       }
   }
 }
@@ -50,6 +47,9 @@ pub fn build(target: BuildTarget) {
 fn do_build(target: BuildTarget) -> Result(Nil, Error) {
   let is_dev = envie.get_string("NODE_ENV", "production") == "development"
 
+  io.println_info(
+    "Compiling project for " <> build_target_to_string(target) <> " target...",
+  )
   use _ <- result.try(
     shellout.command(
       "gleam",
@@ -60,42 +60,57 @@ fn do_build(target: BuildTarget) -> Result(Nil, Error) {
     |> result.replace_error(FailedToBuildProjectWithTarget),
   )
 
+  io.println_info("Loading project...")
   use project <- result.try(
     project.load() |> result.map_error(CannotLoadProject),
   )
 
+  io.println_info("Creating temporary build folder...")
   use _ <- result.try(
-    simplifile.create_directory_all("./build/dev/javascript/.giolt-build")
-    |> result.map_error(CannotCreateBuildFolder),
-  )
-
-  use _ <- result.try(
-    simplifile.copy_file(
-      "./build/dev/javascript/giolt_sdk/priv/bundle_assets/javascript/index.mjs",
-      "./build/dev/javascript/.giolt-build/index.mjs",
+    simplifile.create_directory_all(
+      "./build/dev/" <> build_target_to_string(target) <> "/.giolt-build",
     )
     |> result.map_error(CannotCreateBuildFolder),
   )
 
-  use index_file_text <- result.try(
-    simplifile.read("./build/dev/javascript/.giolt-build/index.mjs")
-    |> result.map_error(CannotCreateBuildFolder),
-  )
+  let _ = case target {
+    Javascript -> {
+      io.println_info("Generating Javascript files...")
+      use _ <- result.try(
+        simplifile.copy_file(
+          "./build/dev/javascript/giolt_sdk/priv/bundle_assets/javascript/index.mjs",
+          "./build/dev/javascript/.giolt-build/index.mjs",
+        )
+        |> result.map_error(CannotCreateBuildFolder),
+      )
 
-  let index_file_text =
-    index_file_text
-    |> string.replace("{project}", project.name)
+      use index_file_text <- result.try(
+        simplifile.read("./build/dev/javascript/.giolt-build/index.mjs")
+        |> result.map_error(CannotCreateBuildFolder),
+      )
 
-  use _ <- result.try(
-    simplifile.write(
-      "./build/dev/javascript/.giolt-build/index.mjs",
-      index_file_text,
-    )
-    |> result.map_error(CannotCreateBuildFolder),
-  )
+      let index_file_text =
+        index_file_text
+        |> string.replace("{project}", project.name)
 
+      use _ <- result.try(
+        simplifile.write(
+          "./build/dev/javascript/.giolt-build/index.mjs",
+          index_file_text,
+        )
+        |> result.map_error(CannotCreateBuildFolder),
+      )
+
+      Ok(Nil)
+    }
+    Erlang -> {
+      Error(FailedToBuildProjectWithTarget)
+    }
+  }
+
+  io.println_info("Bundling...")
   let res =
-    esgleam.new("./build/prod/javascript")
+    esgleam.new("./build/prod/" <> build_target_to_string(target))
     |> esgleam.platform(esgleam.Node)
     |> esgleam.autoinstall(True)
     |> esgleam.minify(!is_dev)
@@ -109,7 +124,8 @@ fn do_build(target: BuildTarget) -> Result(Nil, Error) {
     )
     |> esgleam.bundle
 
-  use _ <- result.try(result.flatten(res) |> result.replace_error(CannotBuild))
+  use res <- result.try(res |> result.replace_error(CannotBuild))
+  use _ <- result.try(res |> result.replace_error(CannotBuild))
 
   Ok(Nil)
 }

@@ -3,7 +3,7 @@ import clip
 import clip/help
 import clip/opt
 import giolt/internal/bundle
-import gleam/io
+import giolt/internal/io
 
 type Args {
   Build(target: bundle.BuildTarget)
@@ -17,16 +17,17 @@ fn build_command() -> clip.Command(Args) {
   })
   |> clip.opt(
     opt.new("target")
-    |> opt.help("Target Javascript or Erlang")
+    |> opt.help(
+      "(erlang, javascript) Target Javascript or Erlang(not supported yet)",
+    )
     |> opt.short("t")
-    |> opt.map(fn(opt) {
+    |> opt.try_map(fn(opt) {
       case opt {
-        "javascript" -> bundle.Javascript
-        "erlang" -> bundle.Erlang
-        _ -> bundle.Javascript
+        "javascript" -> Ok(bundle.Javascript)
+        "erlang" -> Error("Erlang support is not available yet")
+        other -> Error("Invalid value for build target " <> other)
       }
-    })
-    |> opt.default(bundle.Javascript),
+    }),
   )
   |> clip.help(help.simple("build", "Run a build"))
 }

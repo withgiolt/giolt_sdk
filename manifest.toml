@@ -11,7 +11,7 @@ packages = [
   { name = "clip", version = "1.2.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "clip", source = "hex", outer_checksum = "B903008782C62B84FD3C2855EDE4805F7F9B545F2D63823953CED33EDA113301" },
   { name = "conversation", version = "2.0.2", build_tools = ["gleam"], requirements = ["gleam_http", "gleam_javascript", "gleam_stdlib"], otp_app = "conversation", source = "hex", outer_checksum = "60AFB424A723D5B29925487BCA66FF09EB157FD3EF72AF072714FEC903701226" },
   { name = "envie", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "envie", source = "hex", outer_checksum = "E7EBA39310F32A40BF3EDDD7CD9C7A2BC289909983D357411C22873415BC322A" },
-  { name = "esgleam", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_regexp", "gleam_stdlib", "simplifile"], source = "git", repo = "https://github.com/withgiolt/esgleam", commit = "4b7e36d33f1dd1ad1f33229fdc53b5b6f22991a0" },
+  { name = "esgleam", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_regexp", "gleam_stdlib", "simplifile"], source = "git", repo = "https://github.com/withgiolt/esgleam", commit = "23470c658e47f730adc6db6c94e14891a7517ef9" },
   { name = "filepath", version = "1.1.2", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "filepath", source = "hex", outer_checksum = "B06A9AF0BF10E51401D64B98E4B627F1D2E48C154967DA7AF4D0914780A6D40A" },
   { name = "gleam_http", version = "4.3.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_http", source = "hex", outer_checksum = "82EA6A717C842456188C190AFB372665EA56CE13D8559BF3B1DD9E40F619EE0C" },
   { name = "gleam_javascript", version = "1.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_javascript", source = "hex", outer_checksum = "D542C4B4F40E942F5D3372D524419FA521A7BB92D621AF696CC286E89D882D55" },
@@ -30,7 +30,7 @@ argv = { version = ">= 1.1.0 and < 2.0.0" }
 clip = { version = ">= 1.2.1 and < 2.0.0" }
 conversation = { version = ">= 2.0.2 and < 3.0.0" }
 envie = { version = ">= 1.2.0 and < 2.0.0" }
-esgleam = { git = "https://github.com/withgiolt/esgleam", ref = "4b7e36d" }
+esgleam = { git = "https://github.com/withgiolt/esgleam", ref = "23470c6" }
 filepath = { version = ">= 1.1.2 and < 2.0.0" }
 gleam_http = { version = ">= 4.3.0 and < 5.0.0" }
 gleam_javascript = { version = ">= 1.0.1 and < 2.0.0" }

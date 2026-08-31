@@ -9,7 +9,7 @@ links = [{ title = "Website", href = "https://giolt.com" }]
 
 [dependencies]
 gleam_stdlib = ">= 1.0.0 and < 2.0.0"
-esgleam = { git = "https://github.com/withgiolt/esgleam", ref = "4b7e36d"}
+esgleam = { git = "https://github.com/withgiolt/esgleam", ref = "23470c6" }
 simplifile = ">= 2.7.0 and < 3.0.0"
 gleam_http = ">= 4.3.0 and < 5.0.0"
 envie = ">= 1.2.0 and < 2.0.0"
