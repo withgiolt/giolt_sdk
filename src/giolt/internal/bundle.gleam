@@ -4,21 +4,37 @@ import giolt/internal/project
 import gleam/io
 import gleam/result
 import gleam/string
+import shellout
 import simplifile
 
 pub type Error {
+  FailedToBuildProjectWithTarget
   CannotLoadProject(reason: project.Error)
   CannotCreateBuildFolder(reason: simplifile.FileError)
   CannotBuild
 }
 
-pub fn build() {
-  let res = do_build()
+pub type BuildTarget {
+  Javascript
+  Erlang
+}
+
+pub fn build_target_to_string(target: BuildTarget) {
+  case target {
+    Javascript -> "javascript"
+    Erlang -> "erlang"
+  }
+}
+
+pub fn build(target: BuildTarget) {
+  let res = do_build(target)
 
   case res {
     Ok(_) -> io.println("[GioltSDK Bundle] JavaScript bundled successfully")
     Error(err) ->
       case err {
+        FailedToBuildProjectWithTarget ->
+          io.println("[GioltSDK Bundle] Failed to build project for target")
         CannotBuild ->
           io.println("[GioltSDK Bundle] Failed to build bundle with esbuild")
         CannotLoadProject(_) ->
@@ -31,8 +47,19 @@ pub fn build() {
   }
 }
 
-fn do_build() -> Result(Nil, Error) {
+fn do_build(target: BuildTarget) -> Result(Nil, Error) {
   let is_dev = envie.get_string("NODE_ENV", "production") == "development"
+
+  use _ <- result.try(
+    shellout.command(
+      "gleam",
+      ["build", "--target", build_target_to_string(target)],
+      ".",
+      [shellout.LetBeStdout, shellout.LetBeStderr],
+    )
+    |> result.replace_error(FailedToBuildProjectWithTarget),
+  )
+
   use project <- result.try(
     project.load() |> result.map_error(CannotLoadProject),
   )
@@ -44,7 +71,7 @@ fn do_build() -> Result(Nil, Error) {
 
   use _ <- result.try(
     simplifile.copy_file(
-      "./build/dev/javascript/giolt_sdk/priv/templates/javascript/index.mjs",
+      "./build/dev/javascript/giolt_sdk/priv/bundle_assets/javascript/index.mjs",
       "./build/dev/javascript/.giolt-build/index.mjs",
     )
     |> result.map_error(CannotCreateBuildFolder),

@@ -1,6 +1,0 @@
-name = "example"
-main = "./build/prod/javascript/index.js"
-
-[build]
-command = "gleam run -m build"
-watch_dir = "./src"
