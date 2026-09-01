@@ -26,7 +26,7 @@ jobs:
           deno-version: v2.x
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Cache Gleam build
@@ -41,10 +41,10 @@ jobs:
           gleam deps download
           deno ci # if you have deno.lock, else `deno install` - matches Deploy `deno ci`
 
+      - name: Publish to npm
+        run: just publish-npm
+
       - name: Publish to Hex
         run: just publish-hex
         env:
           HEXPM_API_KEY: ${{ secrets.HEXPM_API_KEY }}
-
-      - name: Publish to npm
-        run: just publish-npm
