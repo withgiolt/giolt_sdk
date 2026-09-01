@@ -12,6 +12,9 @@ import simplifile
 
 pub type Error {
   FailedToBuildProjectWithTarget
+  FailedToDeleteOutdir(reason: simplifile.FileError)
+  CannotParsePrebuildCommand
+  FailedToRunPrebuildCommand
   CannotLoadProject(reason: project.Error)
   CannotCreateBuildFolder(reason: simplifile.FileError)
   CannotCopyStaticDir(reason: simplifile.FileError)
@@ -39,9 +42,17 @@ pub fn build(target: project.BuildTarget) {
     Ok(_) -> io.println_success("JavaScript bundled successfully")
     Error(err) ->
       case err {
+        FailedToDeleteOutdir(e) ->
+          io.println_error(
+            "Failed to build project for target. Reason: " <> string.inspect(e),
+          )
         FailedToBuildProjectWithTarget ->
           io.println_error("Failed to build project for target")
+        CannotParsePrebuildCommand ->
+          io.println_error("Failed to build project for target")
         CannotBundle -> io.println_error("Failed to build bundle with esbuild")
+        FailedToRunPrebuildCommand ->
+          io.println_error("Failed to run prebuild command")
         CannotLoadProject(e) ->
           io.println_error(
             "Failed to load project properties. Reason: " <> string.inspect(e),
@@ -70,6 +81,18 @@ fn run_pipeline(target: project.BuildTarget) {
     project.load() |> result.map_error(CannotLoadProject),
   )
 
+  io.println_info("Clearing " <> project.config.outdir <> " folder...")
+  use _ <- result.try(
+    simplifile.delete(project.config.outdir)
+    |> result.map_error(FailedToDeleteOutdir),
+  )
+
+  use _ <- result.try(
+    do_if(option.is_some(project.config.prebuild_command), fn() {
+      do_prebuild(project)
+    }),
+  )
+
   use _ <- result.try(
     do_if(option.is_some(project.config.entry_module), fn() {
       do_bundle(target, project)
@@ -92,6 +115,34 @@ fn gleam_build(target: project.BuildTarget) {
       [shellout.LetBeStdout, shellout.LetBeStderr],
     )
     |> result.replace_error(FailedToBuildProjectWithTarget),
+  )
+
+  Ok(Nil)
+}
+
+fn do_prebuild(project: project.Project) -> Result(Nil, Error) {
+  use exec <- result.try(
+    project.config.prebuild_command
+    // We know for sure that prebuild_command is Some as we checked earlier
+    |> option.unwrap("")
+    |> string.split(" ")
+    |> list.first
+    |> result.replace_error(CannotParsePrebuildCommand),
+  )
+
+  let args =
+    project.config.prebuild_command
+    // We know for sure that prebuild_command is Some as we checked earlier
+    |> option.unwrap("")
+    |> string.split(" ")
+    |> list.drop(1)
+
+  use _ <- result.try(
+    shellout.command(exec, args, ".", [
+      shellout.LetBeStdout,
+      shellout.LetBeStderr,
+    ])
+    |> result.replace_error(FailedToRunPrebuildCommand),
   )
 
   Ok(Nil)

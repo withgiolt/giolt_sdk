@@ -4,3 +4,4 @@
 /dist
 erl_crash.dump
 bin/
+.DS_Store
