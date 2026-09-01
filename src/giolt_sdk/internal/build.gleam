@@ -3,6 +3,7 @@ import filepath
 import giolt_sdk/internal/esgleam/esgleam
 import giolt_sdk/internal/io
 import giolt_sdk/internal/project
+import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
@@ -165,7 +166,14 @@ fn do_bundle(
     |> esgleam.minify(!is_dev)
     |> esgleam.entry("../_giolt_build/index.mjs")
     |> esgleam.raw(
-      "--tree-shaking --splitting"
+      "--tree-shaking --splitting "
+      <> case project.config.bundle_aliases {
+        [] -> ""
+        aliases -> {
+          list.map(aliases, fn(alias) { "--alias:" <> alias })
+          |> string.join(" ")
+        }
+      }
       <> case is_dev {
         True -> " --sourcemap"
         False -> ""
