@@ -1,7 +1,7 @@
 import envie
 import esgleam
-import giolt/internal/io
-import giolt/internal/project
+import giolt_sdk/internal/io
+import giolt_sdk/internal/project
 import gleam/result
 import gleam/string
 import shellout
@@ -14,19 +14,14 @@ pub type Error {
   CannotBuild
 }
 
-pub type BuildTarget {
-  Javascript
-  Erlang
-}
-
-pub fn build_target_to_string(target: BuildTarget) {
+pub fn build_target_to_string(target: project.BuildTarget) {
   case target {
-    Javascript -> "javascript"
-    Erlang -> "erlang"
+    project.Javascript -> "javascript"
+    project.Erlang -> "erlang"
   }
 }
 
-pub fn build(target: BuildTarget) {
+pub fn build(target: project.BuildTarget) {
   let res = do_build(target)
 
   case res {
@@ -44,7 +39,7 @@ pub fn build(target: BuildTarget) {
   }
 }
 
-fn do_build(target: BuildTarget) -> Result(Nil, Error) {
+fn do_build(target: project.BuildTarget) -> Result(Nil, Error) {
   let is_dev = envie.get_string("NODE_ENV", "production") == "development"
 
   io.println_info(
@@ -74,7 +69,7 @@ fn do_build(target: BuildTarget) -> Result(Nil, Error) {
   )
 
   let _ = case target {
-    Javascript -> {
+    project.Javascript -> {
       io.println_info("Generating Javascript files...")
       use _ <- result.try(
         simplifile.copy_file(
@@ -103,7 +98,7 @@ fn do_build(target: BuildTarget) -> Result(Nil, Error) {
 
       Ok(Nil)
     }
-    Erlang -> {
+    project.Erlang -> {
       Error(FailedToBuildProjectWithTarget)
     }
   }

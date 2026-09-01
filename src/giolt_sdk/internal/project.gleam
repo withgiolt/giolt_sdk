@@ -1,4 +1,5 @@
 import filepath
+import gleam/option
 import gleam/result
 import simplifile
 import tom
@@ -7,10 +8,20 @@ pub type Error {
   CannotReadGleamToml(reason: simplifile.FileError)
   CannotParseGleamToml
   CannotReadProjectName(reason: tom.GetError)
+  InvalidProjectBuildTarget
+}
+
+pub type BuildTarget {
+  Javascript
+  Erlang
 }
 
 pub type Project {
-  Project(name: String, root_directory: String)
+  Project(
+    name: String,
+    target: option.Option(BuildTarget),
+    root_directory: String,
+  )
 }
 
 pub fn load() -> Result(Project, Error) {
@@ -28,7 +39,21 @@ pub fn load() -> Result(Project, Error) {
     tom.get_string(gleam_toml, ["name"])
     |> result.map_error(CannotReadProjectName),
   )
-  Ok(Project(name:, root_directory:))
+
+  use target <- result.try(
+    case tom.get_string(gleam_toml, ["target"]) {
+      Ok(target) ->
+        case target {
+          "javascript" -> Ok(option.Some(Javascript))
+          "erlang" -> Ok(option.Some(Erlang))
+          _ -> Error(option.None)
+        }
+      Error(_) -> Ok(option.None)
+    }
+    |> result.replace_error(InvalidProjectBuildTarget),
+  )
+
+  Ok(Project(name:, target:, root_directory:))
 }
 
 fn find_root_directory(current_path: String) -> _ {

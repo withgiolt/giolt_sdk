@@ -1,7 +1,8 @@
 name = "giolt_sdk"
 version = "1.0.0"
 
-internal_modules = ["giolt/internal"]
+internal_modules = ["giolt_sdk/internal"]
+target = "javascript"
 description = ""
 licences = ["Apache-2.0"]
 repository = { type = "github", user = "withgiolt", repo = "giolt_sdk" }
