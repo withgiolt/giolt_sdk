@@ -22,7 +22,7 @@ import {
   // @ts-expect-error
 } from "./esgleam/mod/platform.mjs";
 // @ts-expect-error
-import { Ok, Error } from "./gleam.mjs";
+import { Ok, Error } from "../../../gleam.mjs";
 
 import { entries } from "./streaming_tar.mjs";
 
