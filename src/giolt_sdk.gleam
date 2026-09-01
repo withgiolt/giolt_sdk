@@ -2,7 +2,7 @@ import argv
 import clip
 import clip/help
 import clip/opt
-import giolt_sdk/internal/bundle
+import giolt_sdk/internal/build
 import giolt_sdk/internal/io
 import giolt_sdk/internal/project
 import gleam/option
@@ -37,8 +37,7 @@ fn build_command() -> clip.Command(Args) {
       case value {
         "javascript" -> Ok(project.Javascript)
         "erlang" -> Ok(project.Erlang)
-        _ ->
-          Error("target must be 'javascript' or 'erlang', got: " <> value)
+        _ -> Error("target must be 'javascript' or 'erlang', got: " <> value)
       }
     })
     |> opt.default(default_target),
@@ -60,7 +59,7 @@ pub fn main() -> Nil {
     Error(e) -> io.println_error(e)
     Ok(args) ->
       case args {
-        Build(target) -> bundle.build(target)
+        Build(target) -> build.build(target)
       }
   }
 }

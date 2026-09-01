@@ -1,4 +1,5 @@
 import filepath
+import gleam/dict
 import gleam/option
 import gleam/result
 import simplifile
@@ -7,7 +8,7 @@ import tom
 pub type Error {
   CannotReadGleamToml(reason: simplifile.FileError)
   CannotParseGleamToml
-  CannotReadProjectName(reason: tom.GetError)
+  CannotReadGleamTomlProperty(reason: tom.GetError)
   InvalidProjectBuildTarget
 }
 
@@ -21,8 +22,23 @@ pub type Project {
     name: String,
     target: option.Option(BuildTarget),
     root_directory: String,
+    config: GioltConfig,
   )
 }
+
+pub type GioltConfig {
+  GioltConfig(
+    outdir: String,
+    static_dir: option.Option(String),
+    entry: option.Option(String),
+  )
+}
+
+pub const default_config = GioltConfig(
+  outdir: "./dist",
+  static_dir: option.None,
+  entry: option.None,
+)
 
 pub fn load() -> Result(Project, Error) {
   let root_directory = find_root_directory(".")
@@ -37,7 +53,7 @@ pub fn load() -> Result(Project, Error) {
   )
   use name <- result.try(
     tom.get_string(gleam_toml, ["name"])
-    |> result.map_error(CannotReadProjectName),
+    |> result.map_error(CannotReadGleamTomlProperty),
   )
 
   use target <- result.try(
@@ -53,7 +69,25 @@ pub fn load() -> Result(Project, Error) {
     |> result.replace_error(InvalidProjectBuildTarget),
   )
 
-  Ok(Project(name:, target:, root_directory:))
+  let config = load_config(gleam_toml)
+
+  Ok(Project(name:, target:, root_directory:, config:))
+}
+
+fn load_config(gleam_toml: dict.Dict(String, tom.Toml)) {
+  let outdir =
+    tom.get_string(gleam_toml, ["tools", "giolt", "outdir"])
+    |> result.unwrap("./dist")
+
+  let static_dir =
+    tom.get_string(gleam_toml, ["tools", "giolt", "static_dir"])
+    |> option.from_result
+
+  let entry =
+    tom.get_string(gleam_toml, ["tools", "giolt", "entry"])
+    |> option.from_result
+
+  GioltConfig(outdir:, static_dir:, entry:)
 }
 
 fn find_root_directory(current_path: String) -> _ {

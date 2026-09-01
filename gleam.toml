@@ -6,7 +6,10 @@ target = "javascript"
 description = ""
 licences = ["Apache-2.0"]
 repository = { type = "github", user = "withgiolt", repo = "giolt_sdk" }
-links = [{ title = "Website", href = "https://giolt.com" }]
+links = [
+    { title = "Website", href = "https://giolt.com" },
+    { title = "Docs", href = "https://docs.giolt.com" }
+]
 
 [dependencies]
 gleam_stdlib = ">= 1.0.0 and < 2.0.0"
@@ -19,7 +22,6 @@ filepath = ">= 1.1.2 and < 2.0.0"
 tom = ">= 2.1.0 and < 3.0.0"
 argv = ">= 1.1.0 and < 2.0.0"
 clip = ">= 1.2.1 and < 2.0.0"
-platform = ">= 1.0.0 and < 2.0.0"
 shellout = ">= 1.8.0 and < 2.0.0"
 conversation = ">= 2.0.2 and < 3.0.0"
 
