@@ -1,0 +1,16 @@
+{
+  "name": "@giolt/sdk",
+  "version": "1.0.1",
+  "private": false,
+  "homepage": "https://docs.giolt.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/withgiolt/giolt_sdk.git"
+  },
+  "description": "The Giolt SDK for deploying Gleam apps to the edge",
+  "license": "(GPL-3.0-or-later OR Apache-2.0)",
+  "bin": "./bin/index.mjs",
+  "scripts": {
+    "start": "node ./bin/index.mjs"
+  }
+}
