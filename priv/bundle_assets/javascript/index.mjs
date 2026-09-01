@@ -1,5 +1,5 @@
 import * as conversation from "../conversation/conversation.mjs";
-import * as app from "../{project}/{project}.mjs";
+import * as app from "../{project}/{module}.mjs";
 
 export default {
   async fetch(request, _env, _ctx) {

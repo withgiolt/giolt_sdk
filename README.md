@@ -14,4 +14,18 @@ gleam add giolt_sdk
 gleam run -m giolt
 ```
 
+## Config
+
+```toml
+# gleam.toml
+
+[tools.giolt]
+outdir = "./dist",
+static_dir = "./public",
+entry_module = "app",
+bundle_aliases = [
+    "@gleam=./build/dev/javascript"
+],
+```
+
 Documentation can be found at [docs.giolt.com](https://docs.giolt.com)

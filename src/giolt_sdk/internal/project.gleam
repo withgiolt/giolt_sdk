@@ -2,7 +2,6 @@ import filepath
 import gleam/dict
 import gleam/list
 import gleam/option
-import gleam/pair
 import gleam/result
 import simplifile
 import tom
@@ -32,7 +31,7 @@ pub type GioltConfig {
   GioltConfig(
     outdir: String,
     static_dir: option.Option(String),
-    entry: option.Option(String),
+    entry_module: option.Option(String),
     bundle_aliases: List(String),
   )
 }
@@ -40,7 +39,7 @@ pub type GioltConfig {
 pub const default_config = GioltConfig(
   outdir: "./dist",
   static_dir: option.None,
-  entry: option.None,
+  entry_module: option.None,
   bundle_aliases: [],
 )
 
@@ -87,8 +86,8 @@ fn load_config(gleam_toml: dict.Dict(String, tom.Toml)) {
     tom.get_string(gleam_toml, ["tools", "giolt", "static_dir"])
     |> option.from_result
 
-  let entry =
-    tom.get_string(gleam_toml, ["tools", "giolt", "entry"])
+  let entry_module =
+    tom.get_string(gleam_toml, ["tools", "giolt", "entry_module"])
     |> option.from_result
 
   let bundle_aliases =
@@ -99,7 +98,7 @@ fn load_config(gleam_toml: dict.Dict(String, tom.Toml)) {
       |> result.unwrap("")
     })
 
-  GioltConfig(outdir:, static_dir:, entry:, bundle_aliases:)
+  GioltConfig(outdir:, static_dir:, entry_module:, bundle_aliases:)
 }
 
 fn find_root_directory(current_path: String) -> _ {

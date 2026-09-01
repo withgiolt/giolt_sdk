@@ -71,7 +71,7 @@ fn run_pipeline(target: project.BuildTarget) {
   )
 
   use _ <- result.try(
-    do_if(option.is_some(project.config.entry), fn() {
+    do_if(option.is_some(project.config.entry_module), fn() {
       do_bundle(target, project)
     }),
   )
@@ -100,6 +100,7 @@ fn gleam_build(target: project.BuildTarget) {
 fn do_copy(project: project.Project) -> Result(Nil, Error) {
   use _ <- result.try(
     simplifile.copy_directory(
+      // We know for sure that static_dir is Some as we checked earlier
       project.config.static_dir |> option.unwrap(""),
       filepath.join(project.config.outdir, "static"),
     )
@@ -142,6 +143,11 @@ fn do_bundle(
       let index_file_text =
         index_file_text
         |> string.replace("{project}", project.name)
+        |> string.replace(
+          "{module}",
+          // We know for sure that static_dir is Some as we checked earlier
+          option.unwrap(project.config.entry_module, ""),
+        )
 
       use _ <- result.try(
         simplifile.write(
