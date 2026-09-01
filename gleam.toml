@@ -1,10 +1,9 @@
 name = "giolt_sdk"
 version = "1.0.0"
-
-internal_modules = ["giolt_sdk/internal"]
+description = "The Giolt SDK for deploying Gleam apps to the edge"
+internal_modules = ["giolt_sdk/internal", "giolt_sdk/internal/*"]
 target = "javascript"
-description = ""
-licences = ["Apache-2.0"]
+licences = ["GPL-3.0-or-later", "Apache-2.0"]
 repository = { type = "github", user = "withgiolt", repo = "giolt_sdk" }
 links = [
     { title = "Website", href = "https://giolt.com" },
@@ -13,7 +12,6 @@ links = [
 
 [dependencies]
 gleam_stdlib = ">= 1.0.0 and < 2.0.0"
-esgleam = { git = "https://github.com/withgiolt/esgleam", ref = "23470c6" }
 simplifile = ">= 2.7.0 and < 3.0.0"
 gleam_http = ">= 4.3.0 and < 5.0.0"
 envie = ">= 1.2.0 and < 2.0.0"
@@ -24,6 +22,7 @@ argv = ">= 1.1.0 and < 2.0.0"
 clip = ">= 1.2.1 and < 2.0.0"
 shellout = ">= 1.8.0 and < 2.0.0"
 conversation = ">= 2.0.2 and < 3.0.0"
+gleam_regexp = ">= 1.1.1 and < 2.0.0"
 
 [dev_dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

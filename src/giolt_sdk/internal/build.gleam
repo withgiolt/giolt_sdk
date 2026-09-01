@@ -1,6 +1,6 @@
 import envie
-import esgleam
 import filepath
+import giolt_sdk/internal/esgleam/esgleam
 import giolt_sdk/internal/io
 import giolt_sdk/internal/project
 import gleam/option

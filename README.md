@@ -1,24 +1,17 @@
 # giolt_sdk
 
 [![Package Version](https://img.shields.io/hexpm/v/giolt_sdk)](https://hex.pm/packages/giolt_sdk)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://giolt-sdk.hexdocs.pm/)
+
+## Install
 
 ```sh
-gleam add giolt_sdk@1
-```
-```gleam
-import giolt_sdk
-
-pub fn main() -> Nil {
-  // TODO: An example of the project in use
-}
+gleam add giolt_sdk
 ```
 
-Further documentation can be found at <https://giolt-sdk.hexdocs.pm/>.
-
-## Development
+## Run
 
 ```sh
-gleam run   # Run the project
-gleam test  # Run the tests
+gleam run -m giolt
 ```
+
+Documentation can be found at [docs.giolt.com](https://docs.giolt.com)
