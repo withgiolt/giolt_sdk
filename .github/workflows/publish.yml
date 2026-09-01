@@ -1,0 +1,52 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    environment: Production
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: extractions/setup-just@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28"
+          gleam-version: "1.18"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Cache Gleam build
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-gleam-build-${{ hashFiles('manifest.toml', 'gleam.toml') }}
+          restore-keys: ${{ runner.os }}-gleam-build-
+
+      - name: Install dependencies
+        run: |
+          gleam deps download
+          deno ci # if you have deno.lock, else `deno install` - matches Deploy `deno ci`
+
+      - name: Publish to Hex
+        run: just publish-hex
+        env:
+          HEXPM_API_KEY: ${{ secrets.HEXPM_API_KEY }}
+
+      - name: Publish to npm
+        run: just publish-npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
