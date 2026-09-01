@@ -2,16 +2,20 @@
 
 [![Package Version](https://img.shields.io/hexpm/v/giolt_sdk)](https://hex.pm/packages/giolt_sdk)
 
-## Install
+## Run via Gleam
 
 ```sh
 gleam add giolt_sdk
 ```
 
-## Run
-
 ```sh
 gleam run -m giolt
+```
+
+## Run via NPM
+
+```sh
+npx @giolt/sdk
 ```
 
 ## Config
@@ -20,12 +24,13 @@ gleam run -m giolt
 # gleam.toml
 
 [tools.giolt]
-outdir = "./dist",
-static_dir = "./public",
-entry_module = "app",
+outdir = "./dist"
+static_dir = "./public"
+prebuild_command = "gleam run -m build"
+entry_module = "app"
 bundle_aliases = [
     "@gleam=./build/dev/javascript"
-],
+]
 ```
 
 Documentation can be found at [docs.giolt.com](https://docs.giolt.com)
