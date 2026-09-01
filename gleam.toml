@@ -1,5 +1,5 @@
 name = "giolt_sdk"
-version = "1.0.1"
+version = "1.0.2"
 description = "The Giolt SDK for deploying Gleam apps to the edge"
 internal_modules = ["giolt_sdk/internal", "giolt_sdk/internal/*"]
 target = "javascript"
