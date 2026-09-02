@@ -223,7 +223,7 @@ fn do_bundle(
     |> esgleam.minify(!is_dev)
     |> esgleam.entry("../_giolt_build/index.mjs")
     |> esgleam.raw(
-      "--tree-shaking --splitting "
+      "--tree-shaking "
       <> case project.config.bundle_aliases {
         [] -> ""
         aliases -> {
