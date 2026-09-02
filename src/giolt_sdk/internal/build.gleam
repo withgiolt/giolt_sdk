@@ -44,13 +44,13 @@ pub fn build(target: project.BuildTarget) {
       case err {
         FailedToDeleteOutdir(e) ->
           io.println_error(
-            "Failed to build project for target. Reason: " <> string.inspect(e),
+            "Failed to delete outdir. Reason: " <> string.inspect(e),
           )
         FailedToBuildProjectWithTarget ->
           io.println_error("Failed to build project for target")
-        CannotParsePrebuildCommand ->
-          io.println_error("Failed to build project for target")
         CannotBundle -> io.println_error("Failed to build bundle with esbuild")
+        CannotParsePrebuildCommand ->
+          io.println_error("Failed to parse the prebuild command")
         FailedToRunPrebuildCommand ->
           io.println_error("Failed to run prebuild command")
         CannotLoadProject(e) ->
@@ -82,10 +82,16 @@ fn run_pipeline(target: project.BuildTarget) {
   )
 
   io.println_info("Clearing " <> project.config.outdir <> " folder...")
-  use _ <- result.try(
-    simplifile.delete(project.config.outdir)
-    |> result.map_error(FailedToDeleteOutdir),
-  )
+  use _ <- result.try(case simplifile.exists(project.config.outdir, False) {
+    Ok(exists) ->
+      case exists {
+        True ->
+          simplifile.delete(project.config.outdir)
+          |> result.map_error(FailedToDeleteOutdir)
+        False -> Ok(Nil)
+      }
+    Error(reason) -> Error(FailedToDeleteOutdir(reason))
+  })
 
   use _ <- result.try(
     do_if(option.is_some(project.config.prebuild_command), fn() {
