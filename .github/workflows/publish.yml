@@ -24,10 +24,6 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Cache Gleam build
         uses: actions/cache@v4
@@ -40,9 +36,6 @@ jobs:
         run: |
           gleam deps download
           deno ci # if you have deno.lock, else `deno install` - matches Deploy `deno ci`
-
-      - name: Publish to npm
-        run: just publish-npm
 
       - name: Publish to Hex
         run: just publish-hex
