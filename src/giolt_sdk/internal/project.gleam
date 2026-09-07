@@ -33,6 +33,7 @@ pub type GioltConfig {
     static_dir: option.Option(String),
     prebuild_command: option.Option(String),
     entry_module: option.Option(String),
+    env_file: String,
     bundle_aliases: List(String),
   )
 }
@@ -41,6 +42,7 @@ pub const default_config = GioltConfig(
   outdir: "./dist",
   static_dir: option.None,
   prebuild_command: option.None,
+  env_file: ".env",
   entry_module: option.None,
   bundle_aliases: [],
 )
@@ -82,7 +84,7 @@ pub fn load() -> Result(Project, Error) {
 fn load_config(gleam_toml: dict.Dict(String, tom.Toml)) {
   let outdir =
     tom.get_string(gleam_toml, ["tools", "giolt", "outdir"])
-    |> result.unwrap("./dist")
+    |> result.unwrap(default_config.outdir)
 
   let static_dir =
     tom.get_string(gleam_toml, ["tools", "giolt", "static_dir"])
@@ -104,12 +106,17 @@ fn load_config(gleam_toml: dict.Dict(String, tom.Toml)) {
       |> result.unwrap("")
     })
 
+  let env_file =
+    tom.get_string(gleam_toml, ["tools", "giolt", "env_file"])
+    |> result.unwrap(default_config.env_file)
+
   GioltConfig(
     outdir:,
     static_dir:,
     entry_module:,
     prebuild_command:,
     bundle_aliases:,
+    env_file:,
   )
 }
 

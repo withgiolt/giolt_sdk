@@ -3,6 +3,7 @@ import filepath
 import giolt_sdk/internal/esgleam/esgleam
 import giolt_sdk/internal/io
 import giolt_sdk/internal/project
+import gleam/dict
 import gleam/list
 import gleam/option
 import gleam/result
@@ -33,6 +34,29 @@ fn do_if(condition: Bool, action: fn() -> Result(Nil, Error)) {
     True -> action()
     False -> Ok(Nil)
   }
+}
+
+fn define_env(from: String) {
+  let _ = envie.load_override_from(from)
+
+  let all_vars =
+    envie.all()
+    |> dict.filter(fn(key, _) {
+      case key {
+        "PUBLIC_" <> _ | "PRIVATE_" <> _ -> True
+        _ -> False
+      }
+    })
+
+  dict.to_list(all_vars)
+  |> list.map(fn(var) {
+    let escaped_value =
+      var.1
+      |> string.replace("\\", "\\\\")
+      |> string.replace("\"", "\\\"")
+    "--define:process.env." <> var.0 <> "=\"" <> escaped_value <> "\""
+  })
+  |> string.join(" ")
 }
 
 pub fn build(target: project.BuildTarget) {
@@ -237,6 +261,8 @@ fn do_bundle(
           |> string.join(" ")
         }
       }
+      <> " "
+      <> define_env(project.config.env_file)
       <> case is_dev {
         True -> " --sourcemap"
         False -> ""
