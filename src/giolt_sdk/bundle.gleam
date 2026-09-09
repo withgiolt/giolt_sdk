@@ -25,7 +25,7 @@ pub type Output {
 
 pub type Error {
   CannotLoadProject(reason: project.Error)
-  EntryNotCompiled(expected_path: String)
+  EntryFileNotFound(path: String)
   InvalidEntry(reason: entry.InvalidEntry)
   CannotClearOutdir(reason: simplifile.FileError)
   CannotWriteShim(reason: simplifile.FileError)
@@ -33,6 +33,7 @@ pub type Error {
   StaticDirNotFound(path: String)
   EsbuildFailed(reason: String)
   UnsafeOutdir(path: String)
+  EntryInsideOutdir(entry: String, outdir: String)
 }
 
 pub const default_outdir = "./dist"
@@ -41,9 +42,9 @@ pub fn new() -> Config(NoEntry) {
   Config(entry: "", static_dir: None, outdir: default_outdir)
 }
 
-pub fn entry(config: Config(has_entry), module: String) -> Config(HasEntry) {
+pub fn entry(config: Config(has_entry), path: String) -> Config(HasEntry) {
   let Config(static_dir:, outdir:, ..) = config
-  Config(entry: module, static_dir:, outdir:)
+  Config(entry: path, static_dir:, outdir:)
 }
 
 pub fn static_dir(
@@ -75,28 +76,32 @@ fn pipeline(config: Config(HasEntry)) -> Result(Output, Error) {
     project.load() |> result.map_error(CannotLoadProject),
   )
 
-  let module = entry.normalise(config.entry)
-  use _ <- result.try(check_entry(project, module))
-
-  use _ <- result.try(check_outdir(config.outdir))
+  use _ <- result.try(check_entry(project, config.entry))
+  use _ <- result.try(check_outdir(config.outdir, config.entry))
   use _ <- result.try(clear_outdir(config.outdir))
-  use _ <- result.try(write_shim(project.name, module))
+  use _ <- result.try(write_shim(config.entry))
   use _ <- result.try(run_esbuild(config.outdir))
   use _ <- result.try(copy_static(config.static_dir, config.outdir))
 
-  Ok(Output(outdir: config.outdir, entry: module, static_dir: config.static_dir))
+  Ok(Output(
+    outdir: config.outdir,
+    entry: config.entry,
+    static_dir: config.static_dir,
+  ))
 }
 
-fn check_entry(project: project.Project, module: String) -> Result(Nil, Error) {
-  let path = entry.compiled_path(project: project.name, module: module)
-
+fn check_entry(
+  project: project.Project,
+  entry_path: String,
+) -> Result(Nil, Error) {
   use source <- result.try(
-    simplifile.read(path) |> result.replace_error(EntryNotCompiled(path)),
+    simplifile.read(entry_path)
+    |> result.replace_error(EntryFileNotFound(entry_path)),
   )
 
   entry.validate(
     target: project.target,
-    module: module,
+    path: entry_path,
     exports: entry.scan_exports(source),
   )
   |> result.map_error(InvalidEntry)
@@ -108,10 +113,36 @@ pub fn is_unsafe_outdir(outdir: String) -> Bool {
   list.contains(unsafe_outdirs, string.trim(outdir))
 }
 
-fn check_outdir(outdir: String) -> Result(Nil, Error) {
+pub fn outdir_contains_entry(
+  outdir outdir: String,
+  entry entry: String,
+) -> Bool {
+  let outdir_norm = normalise_path(outdir)
+  let entry_norm = normalise_path(entry)
+  string.starts_with(entry_norm, outdir_norm <> "/")
+}
+
+fn normalise_path(path: String) -> String {
+  let trimmed = string.trim(path)
+  let without_prefix = case string.starts_with(trimmed, "./") {
+    True -> string.drop_start(trimmed, 2)
+    False -> trimmed
+  }
+
+  case string.ends_with(without_prefix, "/") {
+    True -> string.drop_end(without_prefix, 1)
+    False -> without_prefix
+  }
+}
+
+fn check_outdir(outdir: String, entry_path: String) -> Result(Nil, Error) {
   case is_unsafe_outdir(outdir) {
     True -> Error(UnsafeOutdir(outdir))
-    False -> Ok(Nil)
+    False ->
+      case outdir_contains_entry(outdir: outdir, entry: entry_path) {
+        True -> Error(EntryInsideOutdir(entry: entry_path, outdir: outdir))
+        False -> Ok(Nil)
+      }
   }
 }
 
@@ -122,8 +153,8 @@ fn clear_outdir(outdir: String) -> Result(Nil, Error) {
   }
 }
 
-fn write_shim(project_name: String, module: String) -> Result(Nil, Error) {
-  let specifier = entry.shim_specifier(project: project_name, module: module)
+fn write_shim(entry_path: String) -> Result(Nil, Error) {
+  let specifier = resolve_absolute(entry_path)
 
   use _ <- result.try(
     simplifile.create_directory_all(shim.build_dir)
@@ -133,6 +164,9 @@ fn write_shim(project_name: String, module: String) -> Result(Nil, Error) {
   simplifile.write(shim.path, shim.render(specifier))
   |> result.map_error(CannotWriteShim)
 }
+
+@external(javascript, "./internal/ffi_paths.mjs", "resolve_absolute")
+fn resolve_absolute(path: String) -> String
 
 fn run_esbuild(outdir: String) -> Result(Nil, Error) {
   io.println_info("Bundling...")
@@ -168,12 +202,14 @@ pub fn describe_error(error: Error) -> String {
   case error {
     CannotLoadProject(reason) -> project.describe_error(reason)
 
-    EntryNotCompiled(path) ->
-      "Could not find the compiled entry module at "
+    EntryFileNotFound(path) ->
+      "Could not find the entry file at "
       <> path
       <> ".\n"
-      <> "  Check the module name passed to `bundle.entry`, and that the "
-      <> "project compiles for the javascript target."
+      <> "  Check the path passed to `bundle.entry`. If it points at "
+      <> "compiled Gleam output, make sure the project has been built for "
+      <> "the javascript target first (`gleam build --target javascript`, "
+      <> "or `dev.compile()`)."
 
     InvalidEntry(reason) -> entry.describe_invalid(reason)
 
@@ -195,6 +231,15 @@ pub fn describe_error(error: Error) -> String {
       <> path
       <> "` as the output directory — it gets deleted before every bundle. "
       <> "Pick something more specific, like `./dist`."
+
+    EntryInsideOutdir(entry, outdir) ->
+      "`bundle.entry(\""
+      <> entry
+      <> "\")` points inside `bundle.outdir(\""
+      <> outdir
+      <> "\")`, which gets deleted before every bundle.\n"
+      <> "  Point entry at your compiled Gleam module (e.g. under "
+      <> "./build/dev/javascript/...), not at the bundle's own output."
   }
 }
 

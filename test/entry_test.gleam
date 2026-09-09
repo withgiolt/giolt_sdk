@@ -1,39 +1,5 @@
 import giolt_sdk/internal/entry
 
-pub fn normalise_plain_test() {
-  assert entry.normalise("app") == "app"
-}
-
-pub fn normalise_with_extension_test() {
-  assert entry.normalise("app.gleam") == "app"
-}
-
-pub fn normalise_with_src_prefix_test() {
-  assert entry.normalise("src/app.gleam") == "app"
-}
-
-pub fn normalise_with_dot_slash_test() {
-  assert entry.normalise("./app.gleam") == "app"
-}
-
-pub fn normalise_nested_module_test() {
-  assert entry.normalise("app/server") == "app/server"
-}
-
-pub fn normalise_nested_module_with_extension_test() {
-  assert entry.normalise("src/app/server.gleam") == "app/server"
-}
-
-pub fn compiled_path_test() {
-  assert entry.compiled_path(project: "myapp", module: "app")
-    == "./build/dev/javascript/myapp/app.mjs"
-}
-
-pub fn shim_specifier_test() {
-  assert entry.shim_specifier(project: "myapp", module: "app")
-    == "../myapp/app.mjs"
-}
-
 pub fn scan_exports_finds_handler_test() {
   let source =
     "
@@ -91,7 +57,7 @@ pub fn validate_javascript_ok_test() {
 
   assert entry.validate(
       target: entry.Javascript,
-      module: "app",
+      path: "./build/dev/javascript/app/app.mjs",
       exports: exports,
     )
     == Ok(Nil)
@@ -102,10 +68,10 @@ pub fn validate_javascript_missing_handler_test() {
 
   assert entry.validate(
       target: entry.Javascript,
-      module: "app",
+      path: "./build/dev/javascript/app/app.mjs",
       exports: exports,
     )
-    == Error(entry.MissingHandler("app"))
+    == Error(entry.MissingHandler("./build/dev/javascript/app/app.mjs"))
 }
 
 pub fn validate_javascript_wrong_arity_test() {
@@ -113,14 +79,18 @@ pub fn validate_javascript_wrong_arity_test() {
 
   assert entry.validate(
       target: entry.Javascript,
-      module: "app",
+      path: "./build/dev/javascript/app/app.mjs",
       exports: exports,
     )
-    == Error(entry.HandlerWrongArity("app", 2))
+    == Error(entry.HandlerWrongArity("./build/dev/javascript/app/app.mjs", 2))
 }
 
 pub fn validate_erlang_unsupported_test() {
-  assert entry.validate(target: entry.Erlang, module: "app", exports: [])
+  assert entry.validate(
+      target: entry.Erlang,
+      path: "./build/dev/javascript/app/app.mjs",
+      exports: [],
+    )
     == Error(entry.CheckUnsupported("erlang"))
 }
 

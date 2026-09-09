@@ -12,7 +12,10 @@ pub fn dev_module_test() {
 pub fn render_build_mentions_entry_test() {
   let rendered = templates.render_build("app")
 
-  assert string.contains(rendered, "bundle.entry(\"app\")")
+  assert string.contains(
+    rendered,
+    "bundle.entry(\"./build/dev/javascript/app/app.mjs\")",
+  )
   assert string.contains(rendered, "import giolt_sdk/bundle")
 }
 
@@ -26,7 +29,10 @@ pub fn render_deploy_imports_build_test() {
 pub fn render_dev_mentions_entry_test() {
   let rendered = templates.render_dev("app")
 
-  assert string.contains(rendered, "bundle.entry(\"app\")")
+  assert string.contains(
+    rendered,
+    "bundle.entry(\"./build/dev/javascript/app/app.mjs\")",
+  )
   assert string.contains(rendered, "import giolt_sdk/dev")
 }
 

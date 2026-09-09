@@ -36,7 +36,7 @@ Every public module is a thin effectful shell. Decisions are pure functions in
 
 | Module | Owns |
 | --- | --- |
-| `internal/entry.gleam` | Entry name normalisation, compiled-path resolution, scanning compiled JS for exports, validating a `handler` export |
+| `internal/entry.gleam` | Scanning entry JS source for exports, validating a `handler` export (target-dependent) |
 | `internal/esbuild.gleam` | The esbuild argument list (`Plan -> List(String)`) — no process spawned |
 | `internal/esbuild_bin.gleam` | Installing/running the actual esbuild binary (effectful) |
 | `internal/shim.gleam` | The worker entry template esbuild bundles |
@@ -55,11 +55,21 @@ that function.
 - **No CLI, ever.** Nothing is invoked by `gleam run -m giolt_sdk` (top
   level) or by any `argv`/`clip`-style flag parsing. The only module-name
   invocation is `giolt_sdk/init`.
-- **The SDK never runs `gleam build`.** `bundle.run` only ever reads
-  `./build/dev/javascript/...` — it does not compile the user's Gleam. The
-  dev loop recompiles explicitly via `dev.compile()`, which the user calls
-  themselves as the first line of their `build` closure. Don't quietly make
-  `bundle.run` shell out to `gleam build` — that was a deliberate call.
+- **The SDK never runs `gleam build`.** `bundle.entry` takes a plain path to
+  a JS file (usually compiled Gleam output, but not necessarily) — `bundle.run`
+  only ever reads whatever that path points at, it does not compile the
+  user's Gleam. The dev loop recompiles explicitly via `dev.compile()`, which
+  the user calls themselves as the first line of their `build` closure. Don't
+  quietly make `bundle.run` shell out to `gleam build` — that was a
+  deliberate call.
+- **`bundle.entry` is a path, not a module name.** It used to take a Gleam
+  module name and resolve it under `./build/dev/javascript/...` itself; it no
+  longer does that resolution. The scaffolded templates bake the default
+  compiled path in as a literal string
+  (`./build/dev/javascript/{name}/{name}.mjs`) at scaffold time — there's no
+  runtime module-name-to-path logic left in `internal/entry.gleam`. This is
+  what lets `dev.gleam`'s `build` closure point `bundle.entry` at any JS
+  file, not just the project's own default Gleam entry module.
 - **The bundle has no configuration surface.** No env-file loading, no
   aliases, no minify/sourcemap/platform flags on `bundle.Config`. It is
   always minified, tree-shaken ESM, node platform. If someone wants
