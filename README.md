@@ -34,7 +34,7 @@ import giolt_sdk/bundle
 
 pub fn main() {
   bundle.new()
-  |> bundle.entry("app")
+  |> bundle.entry("./build/dev/javascript/app/app.mjs")
   |> bundle.static_dir("./public")
   |> bundle.outdir("./dist")
   |> bundle.run
@@ -43,8 +43,10 @@ pub fn main() {
 
 Run with `gleam run -m build`. There is nothing to configure about the bundle
 itself — Giolt produces one shape of artifact: a minified, tree shaken ESM
-bundle wrapped in the platform's worker entry. Your entry module needs to
-export a single function:
+bundle wrapped in the platform's worker entry. `bundle.entry` takes a path to
+a JavaScript file — usually your compiled Gleam module, but it can be any
+file, including one your own build already produced — that exports a single
+function:
 
 ```gleam
 pub fn handler(request: Request(Body)) -> Response(Body) {
@@ -90,7 +92,7 @@ pub fn main() {
     use _ <- result.try(dev.compile())
 
     bundle.new()
-    |> bundle.entry("app")
+    |> bundle.entry("./build/dev/javascript/app/app.mjs")
     |> bundle.static_dir("./public")
     |> bundle.run
     |> bundle.discard_output

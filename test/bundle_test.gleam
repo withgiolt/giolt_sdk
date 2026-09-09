@@ -8,9 +8,9 @@ pub fn default_outdir_test() {
   assert bundle.default_outdir == "./dist"
 }
 
-pub fn describe_error_entry_not_compiled_test() {
+pub fn describe_error_entry_file_not_found_test() {
   let message =
-    bundle.describe_error(bundle.EntryNotCompiled(
+    bundle.describe_error(bundle.EntryFileNotFound(
       "./build/dev/javascript/app/app.mjs",
     ))
 
@@ -71,8 +71,47 @@ pub fn discard_output_ok_test() {
 }
 
 pub fn discard_output_error_test() {
-  let error = bundle.EntryNotCompiled("./build/dev/javascript/app/app.mjs")
+  let error = bundle.EntryFileNotFound("./build/dev/javascript/app/app.mjs")
 
   assert bundle.discard_output(Error(error))
     == Error(bundle.describe_error(error))
+}
+
+pub fn outdir_contains_entry_true_test() {
+  assert bundle.outdir_contains_entry(
+    outdir: "./dist",
+    entry: "./dist/index.mjs",
+  )
+}
+
+pub fn outdir_contains_entry_nested_test() {
+  assert bundle.outdir_contains_entry(
+    outdir: "./dist",
+    entry: "./dist/workers/index.mjs",
+  )
+}
+
+pub fn outdir_contains_entry_false_test() {
+  assert !bundle.outdir_contains_entry(
+    outdir: "./dist",
+    entry: "./build/dev/javascript/app/app.mjs",
+  )
+}
+
+pub fn outdir_contains_entry_sibling_prefix_false_test() {
+  assert !bundle.outdir_contains_entry(
+    outdir: "./dist",
+    entry: "./dist-static/index.mjs",
+  )
+}
+
+pub fn describe_error_entry_inside_outdir_test() {
+  let message =
+    bundle.describe_error(bundle.EntryInsideOutdir(
+      entry: "./dist/index.mjs",
+      outdir: "./dist",
+    ))
+
+  assert string.contains(message, "./dist/index.mjs")
+  assert string.contains(message, "./dist")
 }

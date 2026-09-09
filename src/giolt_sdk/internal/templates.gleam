@@ -16,7 +16,7 @@ const build_template = "import giolt_sdk/bundle
 
 pub fn main() {
   bundle.new()
-  |> bundle.entry(\"{name}\")
+  |> bundle.entry(\"./build/dev/javascript/{name}/{name}.mjs\")
   |> bundle.static_dir(\"./public\")
   |> bundle.outdir(\"./dist\")
   |> bundle.run
@@ -53,7 +53,7 @@ pub fn main() {
     use _ <- result.try(dev.compile())
 
     bundle.new()
-    |> bundle.entry(\"{name}\")
+    |> bundle.entry(\"./build/dev/javascript/{name}/{name}.mjs\")
     |> bundle.static_dir(\"./public\")
     |> bundle.run
     |> bundle.discard_output
