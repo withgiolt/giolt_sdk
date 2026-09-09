@@ -1,63 +1,37 @@
-import gleam/dict
 import gleam/io
-import shellout
 
-pub fn println_error(string: String) {
-  "[Giolt SDK]"
-  |> shellout.style(
-    shellout.display(["bold"])
-      |> dict.merge(shellout.color(["white"]))
-      |> dict.merge(shellout.background(["brightblack"])),
-    [],
-  )
-  |> io.print_error
+const reset = "\u{001b}[0m"
 
-  { " " <> string }
-  |> shellout.style(
-    shellout.display(["bold"])
-      |> dict.merge(shellout.color(["red"]))
-      |> dict.merge(shellout.background(["black"])),
-    [],
-  )
-  |> io.println_error
+const bold_white_on_grey = "\u{001b}[1;37;100m"
+
+const bold_red = "\u{001b}[1;31m"
+
+const bold_green = "\u{001b}[1;32m"
+
+const bold_yellow = "\u{001b}[1;33m"
+
+const bold = "\u{001b}[1m"
+
+fn tag() -> String {
+  bold_white_on_grey <> "[Giolt SDK]" <> reset
 }
 
-pub fn println_info(string: String) {
-  "[Giolt SDK]"
-  |> shellout.style(
-    shellout.display(["bold"])
-      |> dict.merge(shellout.color(["white"]))
-      |> dict.merge(shellout.background(["brightblack"])),
-    [],
-  )
-  |> io.print
-
-  { " " <> string }
-  |> shellout.style(
-    shellout.display(["bold"])
-      |> dict.merge(shellout.color(["white"]))
-      |> dict.merge(shellout.background(["black"])),
-    [],
-  )
-  |> io.println
+fn line(colour: String, message: String) -> String {
+  tag() <> " " <> colour <> message <> reset
 }
 
-pub fn println_success(string: String) {
-  "[Giolt SDK]"
-  |> shellout.style(
-    shellout.display(["bold"])
-      |> dict.merge(shellout.color(["white"]))
-      |> dict.merge(shellout.background(["brightblack"])),
-    [],
-  )
-  |> io.print
+pub fn println_info(message: String) -> Nil {
+  io.println(line(bold, message))
+}
 
-  { " " <> string }
-  |> shellout.style(
-    shellout.display(["bold"])
-      |> dict.merge(shellout.color(["brightgreen"]))
-      |> dict.merge(shellout.background(["black"])),
-    [],
-  )
-  |> io.println
+pub fn println_success(message: String) -> Nil {
+  io.println(line(bold_green, message))
+}
+
+pub fn println_warning(message: String) -> Nil {
+  io.println(line(bold_yellow, message))
+}
+
+pub fn println_error(message: String) -> Nil {
+  io.println_error(line(bold_red, message))
 }

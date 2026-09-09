@@ -1,10 +1,8 @@
 default:
     @just --list
 
-publish-npm:
-    gleam build --target javascript
-    deno bundle --minify ./priv/cli_entry.js -o ./bin/index.mjs
-    npm publish
+test:
+    gleam test --target javascript
 
 publish-hex:
     gleam build

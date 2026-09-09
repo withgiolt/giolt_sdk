@@ -1,5 +1,5 @@
 name = "giolt_sdk"
-version = "1.0.5"
+version = "2.0.0"
 description = "The Giolt SDK for deploying Gleam apps to the edge"
 internal_modules = ["giolt_sdk/internal", "giolt_sdk/internal/*"]
 target = "javascript"
@@ -13,14 +13,8 @@ links = [
 [dependencies]
 gleam_stdlib = ">= 1.0.0 and < 2.0.0"
 simplifile = ">= 2.7.0 and < 3.0.0"
-gleam_http = ">= 4.4.0 and < 5.0.0"
-envie = ">= 1.2.0 and < 2.0.0"
 gleam_javascript = ">= 1.0.1 and < 2.0.0"
 filepath = ">= 1.1.2 and < 2.0.0"
-tom = ">= 2.1.0 and < 3.0.0"
-argv = ">= 1.1.0 and < 2.0.0"
-clip = ">= 1.2.1 and < 2.0.0"
-shellout = ">= 1.8.0 and < 2.0.0"
 conversation = ">= 2.0.2 and < 3.0.0"
 gleam_regexp = ">= 1.1.1 and < 2.0.0"
 
