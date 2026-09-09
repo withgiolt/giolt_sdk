@@ -62,6 +62,9 @@ async function serveStatic(staticDir, urlPath, res) {
   );
 
   let filePath = await statFile(join(staticDir, cleanPath));
+  if (!filePath && extname(cleanPath) === "") {
+    filePath = await statFile(join(staticDir, `${cleanPath}.html`));
+  }
   if (!filePath && (urlPath === "/" || urlPath === "")) {
     filePath = await statFile(join(staticDir, "index.html"));
   }
