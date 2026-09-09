@@ -1,5 +1,4 @@
 import filepath
-import giolt_sdk/internal/entry
 import gleam/option
 import gleam/regexp
 import gleam/result
@@ -11,7 +10,7 @@ pub type Error {
 }
 
 pub type Project {
-  Project(name: String, target: entry.Target, root_directory: String)
+  Project(name: String, root_directory: String)
 }
 
 pub fn load() -> Result(Project, Error) {
@@ -27,17 +26,11 @@ pub fn load() -> Result(Project, Error) {
     parse_name(source) |> result.replace_error(CannotReadProjectName),
   )
 
-  Ok(Project(name:, target: parse_target(source), root_directory:))
+  Ok(Project(name:, root_directory:))
 }
 
 pub fn parse_name(source: String) -> Result(String, Nil) {
   first_match(source, "name")
-}
-
-pub fn parse_target(source: String) -> entry.Target {
-  first_match(source, "target")
-  |> result.try(entry.target_from_string)
-  |> result.unwrap(entry.Javascript)
 }
 
 // No multi-line regex flag on this target, so `^` is spelled out by hand.
