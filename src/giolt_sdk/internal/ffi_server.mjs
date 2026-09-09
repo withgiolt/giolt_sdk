@@ -55,17 +55,19 @@ async function statFile(path) {
   }
 }
 
-async function serveStatic(staticDir, urlPath, res) {
+async function serveStatic(staticDir, method, urlPath, res) {
   const cleanPath = normalize(urlPath.split("?")[0]).replace(
     /^(\.\.[/\\])+/,
     "",
   );
+  const routePath = cleanPath.replace(/[/\\]+$/, "");
+  const isRoot = routePath === "" || routePath === ".";
 
   let filePath = await statFile(join(staticDir, cleanPath));
-  if (!filePath && extname(cleanPath) === "") {
-    filePath = await statFile(join(staticDir, `${cleanPath}.html`));
+  if (!filePath && !isRoot && (method === "GET" || method === "HEAD")) {
+    filePath = await statFile(join(staticDir, `${routePath}.html`));
   }
-  if (!filePath && (urlPath === "/" || urlPath === "")) {
+  if (!filePath && isRoot) {
     filePath = await statFile(join(staticDir, "index.html"));
   }
   if (!filePath) return false;
@@ -156,7 +158,10 @@ export function serve(port, staticDir, workerPath, liveReload) {
         return;
       }
 
-      if (staticDir && (await serveStatic(staticDir, req.url ?? "/", res))) {
+      if (
+        staticDir &&
+        (await serveStatic(staticDir, req.method ?? "GET", req.url ?? "/", res))
+      ) {
         return;
       }
 
