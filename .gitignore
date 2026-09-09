@@ -5,5 +5,3 @@
 erl_crash.dump
 bin/
 .DS_Store
-
-.claude/settings.local.json
