@@ -27,3 +27,9 @@ pub fn render_calls_handler_test() {
 
   assert string.contains(rendered, "app.handler(req)")
 }
+
+pub fn render_guards_missing_handler_test() {
+  let rendered = shim.render("/home/user/app/build/dev/javascript/app/app.mjs")
+
+  assert string.contains(rendered, "typeof app.handler !== \"function\"")
+}

@@ -1,6 +1,4 @@
 import giolt_sdk/bundle
-import giolt_sdk/internal/entry
-import giolt_sdk/internal/project
 import gleam/option
 import gleam/string
 
@@ -15,13 +13,6 @@ pub fn describe_error_entry_file_not_found_test() {
     ))
 
   assert string.contains(message, "./build/dev/javascript/app/app.mjs")
-}
-
-pub fn describe_error_invalid_entry_test() {
-  let message =
-    bundle.describe_error(bundle.InvalidEntry(entry.MissingHandler("app")))
-
-  assert string.contains(message, "handler")
 }
 
 pub fn describe_error_static_dir_not_found_test() {
@@ -52,15 +43,6 @@ pub fn describe_error_unsafe_outdir_test() {
   let message = bundle.describe_error(bundle.UnsafeOutdir("."))
 
   assert string.contains(message, "./dist")
-}
-
-pub fn describe_error_cannot_load_project_test() {
-  let message =
-    bundle.describe_error(bundle.CannotLoadProject(
-      project.CannotReadProjectName,
-    ))
-
-  assert string.contains(message, "gleam.toml")
 }
 
 pub fn discard_output_ok_test() {

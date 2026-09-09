@@ -36,12 +36,11 @@ Every public module is a thin effectful shell. Decisions are pure functions in
 
 | Module | Owns |
 | --- | --- |
-| `internal/entry.gleam` | Scanning entry JS source for exports, validating a `handler` export (target-dependent) |
 | `internal/esbuild.gleam` | The esbuild argument list (`Plan -> List(String)`) — no process spawned |
 | `internal/esbuild_bin.gleam` | Installing/running the actual esbuild binary (effectful) |
 | `internal/shim.gleam` | The worker entry template esbuild bundles |
 | `internal/templates.gleam` | The three scaffolded file bodies |
-| `internal/project.gleam` | Reading `name`/`target` out of the consumer's `gleam.toml` |
+| `internal/project.gleam` | Reading `name` out of the consumer's `gleam.toml` |
 | `internal/watcher.gleam` + `ffi_watcher.mjs` | Recursive file watching |
 | `internal/server.gleam` + `ffi_server.mjs` | The dev HTTP server (static dir, worker hot-reload, live-reload SSE) |
 | `internal/esgleam/` | Vendored (Apache-2.0, forked) esbuild platform-detection + tarball extraction only — do not add unrelated code here |
@@ -66,10 +65,23 @@ that function.
   module name and resolve it under `./build/dev/javascript/...` itself; it no
   longer does that resolution. The scaffolded templates bake the default
   compiled path in as a literal string
-  (`./build/dev/javascript/{name}/{name}.mjs`) at scaffold time — there's no
-  runtime module-name-to-path logic left in `internal/entry.gleam`. This is
-  what lets `dev.gleam`'s `build` closure point `bundle.entry` at any JS
-  file, not just the project's own default Gleam entry module.
+  (`./build/dev/javascript/{name}/{name}.mjs`) at scaffold time. This is what
+  lets `dev.gleam`'s `build` closure point `bundle.entry` at any JS file, not
+  just the project's own default Gleam entry module — including a file the
+  user already ran their own esbuild over.
+- **`bundle.run` only checks that the entry file exists, not its contents.**
+  There used to be a regex-based static check (`internal/entry.gleam`, since
+  deleted) that scanned the compiled JS for a `handler` export and its arity.
+  It only ever matched Gleam's own `export function handler(...)` codegen —
+  esbuild's own bundling (which the SDK explicitly allows: "run your own
+  esbuild, we bundle it again") commonly hoists exports into a trailing
+  `export { x as handler };`, arrow functions, minified/renamed bindings,
+  etc., all of which a regex can't reliably keep up with. The check for a
+  working `handler` now happens where it can't be fooled by the entry file's
+  shape: at request time, inside the generated worker shim
+  (`internal/shim.gleam`) — `typeof app.handler !== "function"` returns a
+  clear 500 instead of crashing. Don't reintroduce static export-shape
+  parsing in `bundle.run`.
 - **The bundle has no configuration surface.** No env-file loading, no
   aliases, no minify/sourcemap/platform flags on `bundle.Config`. It is
   always minified, tree-shaken ESM, node platform. If someone wants
@@ -94,10 +106,10 @@ that function.
   resolved) and then returns `Error(NotImplemented(...))` at the one seam
   marked `// TODO` in `deploy.gleam`'s `submit` function. That's intentional,
   not a bug.
-- **Erlang is stubbed, not supported.** `entry.validate` on the `Erlang`
-  target returns `Error(CheckUnsupported("erlang"))`; `esbuild_bin`'s
-  `@target(erlang)` branches return a plain "not supported" error. Leave
-  these as stubs unless explicitly asked to implement real Erlang support.
+- **Erlang is stubbed, not supported.** `esbuild_bin`'s `@target(erlang)`
+  branches return a plain "not supported" error (Gleam's own conditional
+  compilation, not a runtime check on the consumer's project). Leave these as
+  stubs unless explicitly asked to implement real Erlang support.
 
 ## Vendored code
 

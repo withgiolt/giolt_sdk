@@ -1,9 +1,7 @@
 import filepath
-import giolt_sdk/internal/entry
 import giolt_sdk/internal/esbuild
 import giolt_sdk/internal/esbuild_bin
 import giolt_sdk/internal/io
-import giolt_sdk/internal/project
 import giolt_sdk/internal/shim
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -24,9 +22,7 @@ pub type Output {
 }
 
 pub type Error {
-  CannotLoadProject(reason: project.Error)
   EntryFileNotFound(path: String)
-  InvalidEntry(reason: entry.InvalidEntry)
   CannotClearOutdir(reason: simplifile.FileError)
   CannotWriteShim(reason: simplifile.FileError)
   CannotCopyStatic(reason: simplifile.FileError)
@@ -72,11 +68,7 @@ pub fn run(config: Config(HasEntry)) -> Result(Output, Error) {
 }
 
 fn pipeline(config: Config(HasEntry)) -> Result(Output, Error) {
-  use project <- result.try(
-    project.load() |> result.map_error(CannotLoadProject),
-  )
-
-  use _ <- result.try(check_entry(project, config.entry))
+  use _ <- result.try(check_entry(config.entry))
   use _ <- result.try(check_outdir(config.outdir, config.entry))
   use _ <- result.try(clear_outdir(config.outdir))
   use _ <- result.try(write_shim(config.entry))
@@ -90,21 +82,11 @@ fn pipeline(config: Config(HasEntry)) -> Result(Output, Error) {
   ))
 }
 
-fn check_entry(
-  project: project.Project,
-  entry_path: String,
-) -> Result(Nil, Error) {
-  use source <- result.try(
-    simplifile.read(entry_path)
-    |> result.replace_error(EntryFileNotFound(entry_path)),
-  )
-
-  entry.validate(
-    target: project.target,
-    path: entry_path,
-    exports: entry.scan_exports(source),
-  )
-  |> result.map_error(InvalidEntry)
+fn check_entry(entry_path: String) -> Result(Nil, Error) {
+  case simplifile.is_file(entry_path) {
+    Ok(True) -> Ok(Nil)
+    Ok(False) | Error(_) -> Error(EntryFileNotFound(entry_path))
+  }
 }
 
 const unsafe_outdirs = [".", "./", "", "..", "/"]
@@ -200,8 +182,6 @@ fn copy_static(
 
 pub fn describe_error(error: Error) -> String {
   case error {
-    CannotLoadProject(reason) -> project.describe_error(reason)
-
     EntryFileNotFound(path) ->
       "Could not find the entry file at "
       <> path
@@ -210,8 +190,6 @@ pub fn describe_error(error: Error) -> String {
       <> "compiled Gleam output, make sure the project has been built for "
       <> "the javascript target first (`gleam build --target javascript`, "
       <> "or `dev.compile()`)."
-
-    InvalidEntry(reason) -> entry.describe_invalid(reason)
 
     CannotClearOutdir(reason) ->
       "Could not clear the output directory: " <> string.inspect(reason)
