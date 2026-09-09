@@ -1,22 +1,15 @@
-name: Publish
+name: Test
 
 on:
   push:
-    tags:
-      - "v*"
-  workflow_dispatch:
+  pull_request:
 
 jobs:
-  publish:
-    environment: Production
+  test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
 
-      - uses: extractions/setup-just@v4
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "28"
@@ -32,7 +25,8 @@ jobs:
       - name: Install dependencies
         run: gleam deps download
 
-      - name: Publish to Hex
-        run: just publish-hex
-        env:
-          HEXPM_API_KEY: ${{ secrets.HEXPM_API_KEY }}
+      - name: Check formatting
+        run: gleam format --check src test
+
+      - name: Run tests
+        run: gleam test --target javascript

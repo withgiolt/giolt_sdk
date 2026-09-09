@@ -1,132 +1,99 @@
+//// Reading the two things the SDK still needs from the consumer's
+//// `gleam.toml`: the project name and the compilation target.
+////
+//// There is no `[tools.giolt]` section any more — everything that used to
+//// live there is now an argument to `bundle`, `deploy` or `dev`.
+
 import filepath
-import gleam/dict
-import gleam/list
+import giolt_sdk/internal/entry
 import gleam/option
+import gleam/regexp
 import gleam/result
 import simplifile
-import tom
 
 pub type Error {
   CannotReadGleamToml(reason: simplifile.FileError)
-  CannotParseGleamToml
-  CannotReadGleamTomlProperty(reason: tom.GetError)
-  InvalidProjectBuildTarget
-}
-
-pub type BuildTarget {
-  Javascript
-  Erlang
+  CannotReadProjectName
 }
 
 pub type Project {
-  Project(
-    name: String,
-    target: option.Option(BuildTarget),
-    root_directory: String,
-    config: GioltConfig,
-  )
+  Project(name: String, target: entry.Target, root_directory: String)
 }
 
-pub type GioltConfig {
-  GioltConfig(
-    outdir: String,
-    static_dir: option.Option(String),
-    prebuild_command: option.Option(String),
-    entry_module: option.Option(String),
-    env_file: String,
-    bundle_aliases: List(String),
-  )
-}
-
-pub const default_config = GioltConfig(
-  outdir: "./dist",
-  static_dir: option.None,
-  prebuild_command: option.None,
-  env_file: ".env",
-  entry_module: option.None,
-  bundle_aliases: [],
-)
-
+/// Load the project the SDK is running inside.
 pub fn load() -> Result(Project, Error) {
   let root_directory = find_root_directory(".")
-  use gleam_toml <- result.try(
+
+  use source <- result.try(
     filepath.join(root_directory, "gleam.toml")
     |> simplifile.read
     |> result.map_error(CannotReadGleamToml),
   )
-  use gleam_toml <- result.try(
-    tom.parse(gleam_toml)
-    |> result.replace_error(CannotParseGleamToml),
-  )
+
   use name <- result.try(
-    tom.get_string(gleam_toml, ["name"])
-    |> result.map_error(CannotReadGleamTomlProperty),
+    parse_name(source) |> result.replace_error(CannotReadProjectName),
   )
 
-  use target <- result.try(
-    case tom.get_string(gleam_toml, ["target"]) {
-      Ok(target) ->
-        case target {
-          "javascript" -> Ok(option.Some(Javascript))
-          "erlang" -> Ok(option.Some(Erlang))
-          _ -> Error(option.None)
-        }
-      Error(_) -> Ok(option.None)
-    }
-    |> result.replace_error(InvalidProjectBuildTarget),
-  )
-
-  let config = load_config(gleam_toml)
-
-  Ok(Project(name:, target:, root_directory:, config:))
+  Ok(Project(name:, target: parse_target(source), root_directory:))
 }
 
-fn load_config(gleam_toml: dict.Dict(String, tom.Toml)) {
-  let outdir =
-    tom.get_string(gleam_toml, ["tools", "giolt", "outdir"])
-    |> result.unwrap(default_config.outdir)
-
-  let static_dir =
-    tom.get_string(gleam_toml, ["tools", "giolt", "static_dir"])
-    |> option.from_result
-
-  let entry_module =
-    tom.get_string(gleam_toml, ["tools", "giolt", "entry_module"])
-    |> option.from_result
-
-  let prebuild_command =
-    tom.get_string(gleam_toml, ["tools", "giolt", "prebuild_command"])
-    |> option.from_result
-
-  let bundle_aliases =
-    tom.get_array(gleam_toml, ["tools", "giolt", "bundle_aliases"])
-    |> result.unwrap([])
-    |> list.map(fn(alias) {
-      tom.as_string(alias)
-      |> result.unwrap("")
-    })
-
-  let env_file =
-    tom.get_string(gleam_toml, ["tools", "giolt", "env_file"])
-    |> result.unwrap(default_config.env_file)
-
-  GioltConfig(
-    outdir:,
-    static_dir:,
-    entry_module:,
-    prebuild_command:,
-    bundle_aliases:,
-    env_file:,
-  )
+/// Read `name = "..."` out of a `gleam.toml`.
+pub fn parse_name(source: String) -> Result(String, Nil) {
+  first_match(source, "name")
 }
 
-fn find_root_directory(current_path: String) -> _ {
+/// Read `target = "..."` out of a `gleam.toml`. Gleam's own default is Erlang,
+/// but every Giolt project is a JavaScript one, and the scaffolded `gleam.toml`
+/// says so — so an absent or unrecognised target is read as JavaScript and the
+/// entry check will speak up if the project really is not.
+pub fn parse_target(source: String) -> entry.Target {
+  first_match(source, "target")
+  |> result.try(entry.target_from_string)
+  |> result.unwrap(entry.Javascript)
+}
+
+/// Read `{key} = "..."` out of a TOML source, anchored to the start of a
+/// line so that, say, a `description` mentioning the word `name` is not
+/// mistaken for the `name` key.
+///
+/// `gleam/regexp` compiles to JavaScript's `RegExp` without a multi-line flag
+/// available here, so the anchor is spelled out by hand as "start of string,
+/// or right after a newline" rather than relying on one.
+fn first_match(source: String, key: String) -> Result(String, Nil) {
+  use re <- result.try(
+    regexp.from_string("(?:^|\\n)\\s*" <> key <> "\\s*=\\s*\"([^\"]+)\"")
+    |> result.replace_error(Nil),
+  )
+
+  case regexp.scan(re, source) {
+    [match, ..] ->
+      case match.submatches {
+        [option.Some(value), ..] -> Ok(value)
+        _ -> Error(Nil)
+      }
+    [] -> Error(Nil)
+  }
+}
+
+pub fn describe_error(error: Error) -> String {
+  case error {
+    CannotReadGleamToml(_) ->
+      "Could not read gleam.toml. Run this from inside a Gleam project."
+    CannotReadProjectName -> "Could not read `name` from gleam.toml."
+  }
+}
+
+fn find_root_directory(current_path: String) -> String {
+  do_find_root_directory(current_path, 32)
+}
+
+fn do_find_root_directory(current_path: String, remaining: Int) -> String {
   let gleam_toml = filepath.join(current_path, "gleam.toml")
-  case simplifile.is_file(gleam_toml) {
-    Ok(True) -> current_path
-    Ok(False) | Error(_) -> {
-      let path = filepath.join(current_path, "..")
-      find_root_directory(path)
-    }
+
+  case simplifile.is_file(gleam_toml), remaining {
+    Ok(True), _ -> current_path
+    _, 0 -> "."
+    _, _ ->
+      do_find_root_directory(filepath.join(current_path, ".."), remaining - 1)
   }
 }
