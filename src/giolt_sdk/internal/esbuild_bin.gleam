@@ -1,15 +1,8 @@
-//// Getting hold of the esbuild binary and running it.
-////
-//// This is the effectful half of `giolt_sdk/internal/esbuild`; the argument
-//// list it runs is built by the pure `esbuild.flags/1`.
-
 import giolt_sdk/internal/esbuild
 import giolt_sdk/internal/esgleam/esgleam/mod/platform
 import giolt_sdk/internal/io
 import simplifile
 
-/// Make sure esbuild is available, downloading it on first use, and return the
-/// path to the executable.
 pub fn ensure_installed() -> Result(String, String) {
   let exe = esbuild.exe_path(platform.get_exe_name())
 
@@ -27,7 +20,6 @@ pub fn ensure_installed() -> Result(String, String) {
   }
 }
 
-/// Run esbuild with the given arguments, streaming its output to the terminal.
 pub fn run(exe: String, args: List(String)) -> Result(Nil, String) {
   exec(exe, args)
 }

@@ -1,8 +1,3 @@
-//// Terminal output for the SDK.
-////
-//// Plain ANSI escapes, so the SDK does not need a dependency just to colour a
-//// prefix.
-
 import gleam/io
 
 const reset = "\u{001b}[0m"

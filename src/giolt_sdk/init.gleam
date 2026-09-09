@@ -1,14 +1,3 @@
-//// Scaffolds `build.gleam`, `deploy.gleam` and `{project}_dev.gleam`.
-////
-//// ```sh
-//// gleam run -m giolt_sdk/init
-//// ```
-////
-//// Takes no arguments. Reads the project name out of `gleam.toml`, writes the
-//// three files into `src/` if they are not already there, and reports what it
-//// did. Existing files are never overwritten — re-run it as many times as you
-//// like.
-
 import giolt_sdk/internal/io
 import giolt_sdk/internal/project
 import giolt_sdk/internal/templates

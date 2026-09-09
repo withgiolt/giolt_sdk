@@ -33,11 +33,6 @@ This reads your project name out of `gleam.toml` and writes three files into
 import giolt_sdk/bundle
 
 pub fn main() {
-  // Anything you need before the bundle is plain Gleam code — Giolt does not
-  // build anything for you:
-  //
-  //   let assert Ok(_) = tailwind.run("./src/app.css", "./public/app.css")
-
   bundle.new()
   |> bundle.entry("app")
   |> bundle.static_dir("./public")
@@ -90,11 +85,8 @@ pub fn main() {
   dev.new()
   |> dev.watch("./src")
   |> dev.watch("./public")
-  |> dev.ignore("**/*_dev.gleam")
   |> dev.prebuild(fn() { Ok(Nil) })
   |> dev.build(fn(_change) {
-    // `bundle.run` only ever bundles what's already in `./build`, so
-    // recompile Gleam to JavaScript first.
     use _ <- result.try(dev.compile())
 
     bundle.new()
@@ -111,13 +103,6 @@ pub fn main() {
 }
 ```
 
-Run with `gleam run -m {project}_dev`.
-
-## Where each of these builders come from
-
-All three are opaque, phantom typed configurations, in the style of
-[`lustre_ssg`](https://hexdocs.pm/lustre_ssg/): required fields flip a type
-parameter when set, so `bundle.new() |> bundle.run` (an entry was never given)
-is a compile error, not something you discover at build time.
+Run with `gleam dev`.
 
 Documentation can be found at [docs.giolt.com](https://docs.giolt.com).

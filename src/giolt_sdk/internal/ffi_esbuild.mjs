@@ -1,21 +1,7 @@
-// @ts-check
-//
-// Downloading and running the esbuild binary.
-//
-// The download runs in a synchronous child process so that `bundle.run` stays
-// synchronous: fetching and un-tarring are async, but a user's build.gleam
-// reads much better as a plain `Result` pipeline than as a promise chain.
 import { spawnSync } from "node:child_process";
 import { default as process } from "node:process";
-// @ts-expect-error
 import { Ok, Error as GleamError } from "../../gleam.mjs";
 
-/**
- * Run the esbuild binary, streaming its output to the terminal.
- *
- * @param {string} command
- * @param {{ toArray: () => string[] }} args
- */
 export function exec(command, args) {
   const result = spawnSync(command, args.toArray(), {
     cwd: ".",
@@ -33,13 +19,6 @@ export function exec(command, args) {
   return new GleamError(`esbuild exited with status ${result.status}`);
 }
 
-/**
- * Download the esbuild binary for this platform and make it executable.
- *
- * @param {string} url tarball to fetch
- * @param {string} directory to write the binary into
- * @param {string} exe_name file name to give the binary
- */
 export function install(url, directory, exe_name) {
   const tar = new URL("./esgleam/streaming_tar.mjs", import.meta.url).href;
 

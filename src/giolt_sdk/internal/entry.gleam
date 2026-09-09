@@ -1,9 +1,3 @@
-//// Everything the SDK needs to decide about a user's entry module.
-////
-//// All of the functions in here are pure: they take strings and lists and
-//// return values. Reading the compiled module off disk happens in
-//// `giolt_sdk/bundle`, so this module is directly unit testable.
-
 import gleam/int
 import gleam/list
 import gleam/option
@@ -11,38 +5,23 @@ import gleam/regexp
 import gleam/result
 import gleam/string
 
-/// The compilation target of the user's project, read from `gleam.toml`.
 pub type Target {
   Javascript
   Erlang
 }
 
-/// A function exported by a compiled module.
 pub type Export {
   Export(name: String, arity: Int)
 }
 
-/// Why an entry module is not a usable Giolt entry.
 pub type InvalidEntry {
-  /// The module does not export a `handler` function at all.
   MissingHandler(module: String)
-  /// The module exports `handler`, but it does not take a single request.
   HandlerWrongArity(module: String, found: Int)
-  /// We do not know how to check entries for this target yet.
   CheckUnsupported(target: String)
 }
 
-/// The name a Giolt entry module must export.
 pub const handler_name = "handler"
 
-/// Turn any of the spellings a user might reasonably write into a module path.
-///
-/// ```gleam
-/// normalise("src/app.gleam")  // -> "app"
-/// normalise("app.gleam")      // -> "app"
-/// normalise("./app")          // -> "app"
-/// normalise("app/server")     // -> "app/server"
-/// ```
 pub fn normalise(entry: String) -> String {
   entry
   |> string.trim
@@ -54,15 +33,10 @@ pub fn normalise(entry: String) -> String {
   |> trim_slashes
 }
 
-/// Where the Gleam compiler puts the JavaScript for a module.
 pub fn compiled_path(project project: String, module module: String) -> String {
   "./build/dev/javascript/" <> project <> "/" <> module <> ".mjs"
 }
 
-/// The specifier the generated worker shim uses to import the entry module.
-///
-/// The shim lives in `build/dev/javascript/_giolt_build/`, one directory up
-/// from the package directories, so entries are reached as `../{project}/…`.
 pub fn shim_specifier(
   project project: String,
   module module: String,
@@ -70,11 +44,6 @@ pub fn shim_specifier(
   "../" <> project <> "/" <> module <> ".mjs"
 }
 
-/// Read the exported functions out of a compiled JavaScript module.
-///
-/// Gleam's JavaScript codegen emits top level `export function name(a, b) {`
-/// declarations, so a source scan is enough and — unlike a dynamic `import()`
-/// — it keeps `bundle.run` synchronous.
 pub fn scan_exports(source: String) -> List(Export) {
   let assert Ok(re) =
     regexp.from_string(
@@ -92,12 +61,6 @@ pub fn scan_exports(source: String) -> List(Export) {
   })
 }
 
-/// Decide whether a module's exports make it a valid entry for the target.
-///
-/// On JavaScript an entry must export `handler` taking exactly one argument,
-/// the request. Whether it returns a `Response` or a `Promise(Response)` is not
-/// visible in the compiled JavaScript, and the worker shim awaits the result
-/// either way, so that half is deliberately not checked.
 pub fn validate(
   target target: Target,
   module module: String,
@@ -105,10 +68,7 @@ pub fn validate(
 ) -> Result(Nil, InvalidEntry) {
   case target {
     Javascript -> validate_javascript(module, exports)
-
-    // TODO: the Erlang target is not supported yet. When it is, an entry will
-    // need a different shape check here (an exported `handler/1` in the
-    // generated `.erl`, most likely) rather than the JavaScript one.
+    // TODO: Erlang entries are not checked yet.
     Erlang -> Error(CheckUnsupported("erlang"))
   }
 }
@@ -124,7 +84,6 @@ fn validate_javascript(
   }
 }
 
-/// A message suitable for showing to the user.
 pub fn describe_invalid(error: InvalidEntry) -> String {
   case error {
     MissingHandler(module) ->
@@ -181,8 +140,6 @@ fn trim_slashes(value: String) -> String {
   |> string.join("/")
 }
 
-/// Parse the `target` key of a `gleam.toml`. Absent means JavaScript, which is
-/// what Giolt deploys.
 pub fn target_from_string(value: String) -> Result(Target, Nil) {
   case string.trim(value) {
     "javascript" -> Ok(Javascript)
@@ -198,7 +155,6 @@ pub fn target_to_string(target: Target) -> String {
   }
 }
 
-/// Convenience for callers holding an optional target.
 pub fn target_or_default(target: Result(Target, a)) -> Target {
   result.unwrap(target, Javascript)
 }

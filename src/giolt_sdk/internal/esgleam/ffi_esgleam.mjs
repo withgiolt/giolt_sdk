@@ -1,8 +1,4 @@
 // Modified from Enderchief/esgleam - see https://github.com/withgiolt/esgleam
-// @ts-check
-//
-// Only the platform detection used by `esgleam/mod/platform` is kept here.
-// Downloading and running esbuild lives in `../ffi_esbuild.mjs`.
 import { default as process } from "node:process";
 import {
   Android,
@@ -17,12 +13,9 @@ import {
   Ia32,
   Ppc64,
   X64,
-  // @ts-expect-error
 } from "./esgleam/mod/platform.mjs";
-// @ts-expect-error
 import { Ok, Error } from "../../../gleam.mjs";
 
-/** @type {Partial<Record<NodeJS.Platform, () => unknown>>} */
 const platform_map = {
   android: () => new Android(),
   darwin: () => new Darwin(),
@@ -40,7 +33,6 @@ export function get_os() {
   return new Error(undefined);
 }
 
-/** @type {Partial<Record<NodeJS.Architecture, () => unknown>>} */
 const arch_map = {
   arm: () => new Arm(),
   arm64: () => new Arm64(),

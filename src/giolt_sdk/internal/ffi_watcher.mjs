@@ -1,18 +1,8 @@
-// @ts-check
-//
-// Recursive `fs.watch` over a list of directories, coalesced onto a short
-// fixed window so that one save does not fire a burst of rebuilds. The
-// coalescing window is an implementation detail, not something projects
-// configure, so it lives here rather than as a `dev.debounce` knob.
 import { watch as fsWatch, existsSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
 const COALESCE_MS = 100;
 
-/**
- * @param {{ toArray: () => string[] }} paths
- * @param {(path: string, kind: string) => void} on_change
- */
 export function watch(paths, on_change) {
   const directories = paths.toArray();
   const watchers = [];

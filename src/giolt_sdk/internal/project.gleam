@@ -1,9 +1,3 @@
-//// Reading the two things the SDK still needs from the consumer's
-//// `gleam.toml`: the project name and the compilation target.
-////
-//// There is no `[tools.giolt]` section any more — everything that used to
-//// live there is now an argument to `bundle`, `deploy` or `dev`.
-
 import filepath
 import giolt_sdk/internal/entry
 import gleam/option
@@ -20,7 +14,6 @@ pub type Project {
   Project(name: String, target: entry.Target, root_directory: String)
 }
 
-/// Load the project the SDK is running inside.
 pub fn load() -> Result(Project, Error) {
   let root_directory = find_root_directory(".")
 
@@ -37,28 +30,17 @@ pub fn load() -> Result(Project, Error) {
   Ok(Project(name:, target: parse_target(source), root_directory:))
 }
 
-/// Read `name = "..."` out of a `gleam.toml`.
 pub fn parse_name(source: String) -> Result(String, Nil) {
   first_match(source, "name")
 }
 
-/// Read `target = "..."` out of a `gleam.toml`. Gleam's own default is Erlang,
-/// but every Giolt project is a JavaScript one, and the scaffolded `gleam.toml`
-/// says so — so an absent or unrecognised target is read as JavaScript and the
-/// entry check will speak up if the project really is not.
 pub fn parse_target(source: String) -> entry.Target {
   first_match(source, "target")
   |> result.try(entry.target_from_string)
   |> result.unwrap(entry.Javascript)
 }
 
-/// Read `{key} = "..."` out of a TOML source, anchored to the start of a
-/// line so that, say, a `description` mentioning the word `name` is not
-/// mistaken for the `name` key.
-///
-/// `gleam/regexp` compiles to JavaScript's `RegExp` without a multi-line flag
-/// available here, so the anchor is spelled out by hand as "start of string,
-/// or right after a newline" rather than relying on one.
+// No multi-line regex flag on this target, so `^` is spelled out by hand.
 fn first_match(source: String, key: String) -> Result(String, Nil) {
   use re <- result.try(
     regexp.from_string("(?:^|\\n)\\s*" <> key <> "\\s*=\\s*\"([^\"]+)\"")

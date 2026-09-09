@@ -1,9 +1,3 @@
-// @ts-check
-//
-// A small Node HTTP server for `dev.serve`: a static directory first, then
-// the bundled worker's `fetch` export. The worker is re-imported with a
-// cache-busting query string after every successful rebuild, so a running
-// dev server always serves the latest bundle without restarting.
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
@@ -36,7 +30,6 @@ const LIVE_RELOAD_SNIPPET = `
 
 let reloadVersion = 0;
 let liveReloadEnabled = false;
-/** @type {Set<import("node:http").ServerResponse>} */
 const sseClients = new Set();
 
 export function notify_reload() {
@@ -62,10 +55,7 @@ async function statFile(path) {
   }
 }
 
-/** Serve a file out of `staticDir`. Returns whether it handled the request. */
 async function serveStatic(staticDir, urlPath, res) {
-  // Strip query strings and collapse `..` before joining, so a request can't
-  // escape the static directory.
   const cleanPath = normalize(urlPath.split("?")[0]).replace(
     /^(\.\.[/\\])+/,
     "",
