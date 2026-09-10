@@ -97,3 +97,28 @@ pub fn describe_error_entry_inside_outdir_test() {
   assert string.contains(message, "./dist/index.mjs")
   assert string.contains(message, "./dist")
 }
+
+pub fn static_dir_is_outdir_target_true_test() {
+  assert bundle.static_dir_is_outdir_target(
+    option.Some("./dist/static"),
+    "./dist",
+  )
+}
+
+pub fn static_dir_is_outdir_target_no_leading_dot_test() {
+  assert bundle.static_dir_is_outdir_target(
+    option.Some("dist/static"),
+    "./dist",
+  )
+}
+
+pub fn static_dir_is_outdir_target_different_outdir_test() {
+  assert !bundle.static_dir_is_outdir_target(
+    option.Some("./public"),
+    "./dist",
+  )
+}
+
+pub fn static_dir_is_outdir_target_none_test() {
+  assert !bundle.static_dir_is_outdir_target(option.None, "./dist")
+}
