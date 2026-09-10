@@ -104,11 +104,16 @@ that function.
   (`internal/shim.gleam`) — `typeof app.handler !== "function"` returns a
   clear 500 instead of crashing. Don't reintroduce static export-shape
   parsing in `bundle.run`.
-- **The bundle has no configuration surface.** No env-file loading, no
-  aliases, no minify/sourcemap/platform flags on `bundle.Config`. It is
-  always minified, tree-shaken ESM, node platform. If someone wants
-  something different, they run their own esbuild before calling `bundle.run`
-  — the SDK bundles it again to adapt it to the platform.
+- **The bundle has almost no configuration surface.** No env-file loading,
+  no aliases. It is always minified, tree-shaken ESM, node platform by
+  default. The one escape hatch is `bundle.additional_args`, a raw
+  `List(String)` of esbuild flags appended after the fixed ones
+  (`internal/esbuild.gleam`'s `flags`) — later flags win, so it's what lets a
+  consumer override a fixed default (`--minify=false`) or mark something
+  `--external` instead of having it bundled again. Don't turn this into
+  named/typed options (a `minify: Bool` field, a `platform` enum, etc.) —
+  it's deliberately one plain pass-through list, not a re-implementation of
+  esbuild's own flag surface.
 - **No env-var handling in the SDK.** There is no `.env` loading, no
   `PUBLIC_`/`PRIVATE_` inlining. `deploy.token_from_env` is the one place the
   SDK reads a real environment variable (via `internal/ffi_env.mjs`, a bare

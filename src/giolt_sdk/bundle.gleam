@@ -14,7 +14,12 @@ pub type NoEntry
 pub type HasEntry
 
 pub opaque type Config(has_entry) {
-  Config(entry: String, static_dir: Option(String), outdir: String)
+  Config(
+    entry: String,
+    static_dir: Option(String),
+    outdir: String,
+    additional_args: List(String),
+  )
 }
 
 pub type Output {
@@ -35,25 +40,38 @@ pub type Error {
 pub const default_outdir = "./dist"
 
 pub fn new() -> Config(NoEntry) {
-  Config(entry: "", static_dir: None, outdir: default_outdir)
+  Config(
+    entry: "",
+    static_dir: None,
+    outdir: default_outdir,
+    additional_args: [],
+  )
 }
 
 pub fn entry(config: Config(has_entry), path: String) -> Config(HasEntry) {
-  let Config(static_dir:, outdir:, ..) = config
-  Config(entry: path, static_dir:, outdir:)
+  let Config(static_dir:, outdir:, additional_args:, ..) = config
+  Config(entry: path, static_dir:, outdir:, additional_args:)
 }
 
 pub fn static_dir(
   config: Config(has_entry),
   path: String,
 ) -> Config(has_entry) {
-  let Config(entry:, outdir:, ..) = config
-  Config(entry:, static_dir: Some(path), outdir:)
+  let Config(entry:, outdir:, additional_args:, ..) = config
+  Config(entry:, static_dir: Some(path), outdir:, additional_args:)
 }
 
 pub fn outdir(config: Config(has_entry), path: String) -> Config(has_entry) {
-  let Config(entry:, static_dir:, ..) = config
-  Config(entry:, static_dir:, outdir: path)
+  let Config(entry:, static_dir:, additional_args:, ..) = config
+  Config(entry:, static_dir:, outdir: path, additional_args:)
+}
+
+pub fn additional_args(
+  config: Config(has_entry),
+  args: List(String),
+) -> Config(has_entry) {
+  let Config(entry:, static_dir:, outdir:, ..) = config
+  Config(entry:, static_dir:, outdir:, additional_args: args)
 }
 
 pub fn run(config: Config(HasEntry)) -> Result(Output, Error) {
@@ -72,7 +90,7 @@ fn pipeline(config: Config(HasEntry)) -> Result(Output, Error) {
   use _ <- result.try(check_outdir(config.outdir, config.entry))
   use _ <- result.try(clear_outdir(config.outdir))
   use _ <- result.try(write_shim(config.entry))
-  use _ <- result.try(run_esbuild(config.outdir))
+  use _ <- result.try(run_esbuild(config.outdir, config.additional_args))
   use _ <- result.try(copy_static(config.static_dir, config.outdir))
 
   Ok(Output(
@@ -150,7 +168,10 @@ fn write_shim(entry_path: String) -> Result(Nil, Error) {
 @external(javascript, "./internal/ffi_paths.mjs", "resolve_absolute")
 fn resolve_absolute(path: String) -> String
 
-fn run_esbuild(outdir: String) -> Result(Nil, Error) {
+fn run_esbuild(
+  outdir: String,
+  additional_args: List(String),
+) -> Result(Nil, Error) {
   io.println_info("Bundling...")
 
   use exe <- result.try(
@@ -158,7 +179,11 @@ fn run_esbuild(outdir: String) -> Result(Nil, Error) {
   )
 
   let plan =
-    esbuild.Plan(entry: shim.path, outfile: filepath.join(outdir, "index.mjs"))
+    esbuild.Plan(
+      entry: shim.path,
+      outfile: filepath.join(outdir, "index.mjs"),
+      additional_args:,
+    )
 
   esbuild_bin.run(exe, esbuild.flags(plan))
   |> result.map_error(EsbuildFailed)

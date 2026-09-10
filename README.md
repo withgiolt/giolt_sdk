@@ -37,16 +37,19 @@ pub fn main() {
   |> bundle.entry("./build/dev/javascript/app/app.mjs")
   |> bundle.static_dir("./public")
   |> bundle.outdir("./dist")
+  |> bundle.additional_args(["--external:node:crypto"])
   |> bundle.run
 }
 ```
 
-Run with `gleam run -m build`. There is nothing to configure about the bundle
-itself — Giolt produces one shape of artifact: a minified, tree shaken ESM
-bundle wrapped in the platform's worker entry. `bundle.entry` takes a path to
-a JavaScript file — usually your compiled Gleam module, but it can be any
-file, including one your own build already produced — that exports a single
-function:
+Run with `gleam run -m build`. Giolt produces one shape of artifact by
+default: a minified, tree shaken ESM bundle wrapped in the platform's worker
+entry. `bundle.additional_args` takes a raw list of esbuild flags appended
+after the SDK's own — later flags win, so it's how you override a default
+(`--minify=false`) or mark something `--external` so esbuild doesn't bundle
+it a second time. `bundle.entry` takes a path to a JavaScript file — usually
+your compiled Gleam module, but it can be any file, including one your own
+build already produced — that exports a single function:
 
 ```gleam
 pub fn handler(request: Request(Body)) -> Response(Body) {

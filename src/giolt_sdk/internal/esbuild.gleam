@@ -1,7 +1,7 @@
 pub const install_dir = "./build/dev/bin/package/bin"
 
 pub type Plan {
-  Plan(entry: String, outfile: String)
+  Plan(entry: String, outfile: String, additional_args: List(String))
 }
 
 pub fn flags(plan: Plan) -> List(String) {
@@ -13,6 +13,7 @@ pub fn flags(plan: Plan) -> List(String) {
     "--minify",
     "--tree-shaking=true",
     "--outfile=" <> plan.outfile,
+    ..plan.additional_args
   ]
 }
 
