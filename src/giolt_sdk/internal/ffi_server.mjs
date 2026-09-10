@@ -23,8 +23,13 @@ const MIME_TYPES = {
 const LIVE_RELOAD_SNIPPET = `
 <script>
   (function () {
+    var seen = false;
     var source = new EventSource("/__giolt_dev/events");
     source.onmessage = function () { location.reload(); };
+    source.onopen = function () {
+      if (seen) { location.reload(); }
+      seen = true;
+    };
   })();
 </script>`;
 

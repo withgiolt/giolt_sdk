@@ -136,6 +136,16 @@ pub fn live_reload(
 }
 
 pub fn run(config: Config(HasWatch, HasBuild)) -> Promise(Nil) {
+  case is_child() {
+    False -> {
+      supervise()
+      promise.resolve(Nil)
+    }
+    True -> run_once(config)
+  }
+}
+
+fn run_once(config: Config(HasWatch, HasBuild)) -> Promise(Nil) {
   let assert Some(build_step) = config.build
 
   case run_prebuild(config.prebuild) {
@@ -144,11 +154,12 @@ pub fn run(config: Config(HasWatch, HasBuild)) -> Promise(Nil) {
       promise.resolve(Nil)
     }
     Ok(_) -> {
-      run_build(build_step, initial_change)
+      run_build(build_step, pending_change())
 
       let stop_watching =
         watcher.watch(config.watch_paths, fn(path, kind) {
-          run_build(build_step, Change(path: path, kind: change_kind(kind)))
+          io.println_info("Changed " <> path <> ", restarting")
+          request_restart(path, kind)
         })
 
       case config.serve_port {
@@ -198,12 +209,26 @@ pub fn change_kind(raw: String) -> ChangeKind {
   }
 }
 
-pub fn compile() -> Result(Nil, String) {
-  do_compile()
-}
-
 @external(javascript, "./internal/ffi_dev.mjs", "forever")
 fn forever() -> Promise(Nil)
 
-@external(javascript, "./internal/ffi_dev.mjs", "compile")
-fn do_compile() -> Result(Nil, String)
+@external(javascript, "./internal/ffi_dev.mjs", "is_child")
+fn is_child() -> Bool
+
+@external(javascript, "./internal/ffi_dev.mjs", "supervise")
+fn supervise() -> Nil
+
+@external(javascript, "./internal/ffi_dev.mjs", "request_restart")
+fn request_restart(path: String, kind: String) -> Nil
+
+@external(javascript, "./internal/ffi_dev.mjs", "pending_change")
+fn do_pending_change() -> #(String, String)
+
+fn pending_change() -> Change {
+  let #(path, kind) = do_pending_change()
+
+  case path {
+    "" -> initial_change
+    _ -> Change(path: path, kind: change_kind(kind))
+  }
+}

@@ -36,10 +36,10 @@ pub fn render_dev_mentions_entry_test() {
   assert string.contains(rendered, "import giolt_sdk/dev")
 }
 
-pub fn render_dev_recompiles_gleam_test() {
+pub fn render_dev_does_not_compile_itself_test() {
   let rendered = templates.render_dev("app")
 
-  assert string.contains(rendered, "dev.compile()")
+  assert !string.contains(rendered, "dev.compile()")
 }
 
 pub fn templates_have_no_leftover_placeholder_test() {
