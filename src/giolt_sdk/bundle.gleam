@@ -68,35 +68,18 @@ pub fn run(config: Config(HasEntry)) -> Result(Output, Error) {
 }
 
 fn pipeline(config: Config(HasEntry)) -> Result(Output, Error) {
-  let static_is_outdir_target =
-    static_dir_is_outdir_target(config.static_dir, config.outdir)
-
   use _ <- result.try(check_entry(config.entry))
   use _ <- result.try(check_outdir(config.outdir, config.entry))
-  use _ <- result.try(clear_outdir(config.outdir, static_is_outdir_target))
+  use _ <- result.try(clear_outdir(config.outdir))
   use _ <- result.try(write_shim(config.entry))
   use _ <- result.try(run_esbuild(config.outdir))
-  use _ <- result.try(case static_is_outdir_target {
-    True -> verify_static(config.static_dir)
-    False -> copy_static(config.static_dir, config.outdir)
-  })
+  use _ <- result.try(copy_static(config.static_dir, config.outdir))
 
   Ok(Output(
     outdir: config.outdir,
     entry: config.entry,
     static_dir: config.static_dir,
   ))
-}
-
-pub fn static_dir_is_outdir_target(
-  static_dir: Option(String),
-  outdir: String,
-) -> Bool {
-  case static_dir {
-    None -> False
-    Some(path) ->
-      normalise_path(path) == normalise_path(filepath.join(outdir, "static"))
-  }
 }
 
 fn check_entry(entry_path: String) -> Result(Nil, Error) {
@@ -145,29 +128,11 @@ fn check_outdir(outdir: String, entry_path: String) -> Result(Nil, Error) {
   }
 }
 
-fn clear_outdir(outdir: String, preserve_static: Bool) -> Result(Nil, Error) {
+fn clear_outdir(outdir: String) -> Result(Nil, Error) {
   case simplifile.is_directory(outdir) {
-    Ok(True) ->
-      case preserve_static {
-        False ->
-          simplifile.delete(outdir) |> result.map_error(CannotClearOutdir)
-        True -> clear_outdir_except_static(outdir)
-      }
+    Ok(True) -> simplifile.delete(outdir) |> result.map_error(CannotClearOutdir)
     Ok(False) | Error(_) -> Ok(Nil)
   }
-}
-
-fn clear_outdir_except_static(outdir: String) -> Result(Nil, Error) {
-  use entries <- result.try(
-    simplifile.read_directory(outdir) |> result.map_error(CannotClearOutdir),
-  )
-
-  entries
-  |> list.filter(fn(entry) { entry != "static" })
-  |> list.try_each(fn(entry) {
-    simplifile.delete(filepath.join(outdir, entry))
-  })
-  |> result.map_error(CannotClearOutdir)
 }
 
 fn write_shim(entry_path: String) -> Result(Nil, Error) {
@@ -210,17 +175,6 @@ fn copy_static(
         Ok(True) ->
           simplifile.copy_directory(path, filepath.join(outdir, "static"))
           |> result.map_error(CannotCopyStatic)
-        Ok(False) | Error(_) -> Error(StaticDirNotFound(path))
-      }
-  }
-}
-
-fn verify_static(static_dir: Option(String)) -> Result(Nil, Error) {
-  case static_dir {
-    None -> Ok(Nil)
-    Some(path) ->
-      case simplifile.is_directory(path) {
-        Ok(True) -> Ok(Nil)
         Ok(False) | Error(_) -> Error(StaticDirNotFound(path))
       }
   }
