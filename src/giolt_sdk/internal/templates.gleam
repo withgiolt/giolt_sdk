@@ -42,7 +42,6 @@ pub fn main() {
 
 const dev_template = "import giolt_sdk/bundle
 import giolt_sdk/dev
-import gleam/result
 
 pub fn main() {
   dev.new()
@@ -50,8 +49,6 @@ pub fn main() {
   |> dev.watch(\"./public\")
   |> dev.prebuild(fn() { Ok(Nil) })
   |> dev.build(fn(_change) {
-    use _ <- result.try(dev.compile())
-
     bundle.new()
     |> bundle.entry(\"./build/dev/javascript/{name}/{name}.mjs\")
     |> bundle.static_dir(\"./public\")

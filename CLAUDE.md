@@ -54,13 +54,35 @@ that function.
 - **No CLI, ever.** Nothing is invoked by `gleam run -m giolt_sdk` (top
   level) or by any `argv`/`clip`-style flag parsing. The only module-name
   invocation is `giolt_sdk/init`.
-- **The SDK never runs `gleam build`.** `bundle.entry` takes a plain path to
+- **`bundle` never runs `gleam build`.** `bundle.entry` takes a plain path to
   a JS file (usually compiled Gleam output, but not necessarily) — `bundle.run`
   only ever reads whatever that path points at, it does not compile the
-  user's Gleam. The dev loop recompiles explicitly via `dev.compile()`, which
-  the user calls themselves as the first line of their `build` closure. Don't
-  quietly make `bundle.run` shell out to `gleam build` — that was a
-  deliberate call.
+  user's Gleam. Don't quietly make `bundle.run` shell out to `gleam build` —
+  that was a deliberate call. `dev` is the one module that compiles, and it
+  does so in its supervisor (see below), not in `bundle`.
+
+- **`dev.run` supervises and restarts; there is no `dev.compile`.** The first
+  process is a supervisor: it runs `gleam build --target javascript`, then
+  spawns itself again with a `--giolt-dev-child` argv flag. The child runs
+  `prebuild`, the `build` closure, the watcher and the server. On a watched
+  change the child writes the change to `build/.giolt-dev-change` and exits
+  with status 75; the supervisor recompiles and spawns a fresh child, which
+  reads that file back so the closure still receives a real `Change`.
+  This exists because a long-lived process freezes its imported modules at
+  startup: a `build` closure that generates output **in-process** (lustre_ssg,
+  codegen, templating) would keep rendering from the code loaded when the
+  process began, even though `gleam build` had just written fresh JS to disk.
+  Subprocess steps (esbuild via `esbuild_bin`) never had this problem, which
+  is why it presented as "static pages stale, worker routes fine". Don't
+  reintroduce an in-process rebuild loop, and don't add a public `compile`
+  back — the supervisor compiling before every child is what makes the
+  closure correct.
+
+- **Nothing in `dev` may read `process.env`.** Under Deno (a supported way to
+  run this — `gleam run --runtime deno`) `process.env` requires `--allow-env`,
+  while `process.argv` needs no permission at all. That is why the child
+  marker is an argv flag and the change handoff is a file. Verified against a
+  real `deno run`, not assumed.
 - **`bundle.entry` is a path, not a module name.** It used to take a Gleam
   module name and resolve it under `./build/dev/javascript/...` itself; it no
   longer does that resolution. The scaffolded templates bake the default

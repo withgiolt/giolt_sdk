@@ -1,4 +1,4 @@
-import { watch as fsWatch, existsSync } from "node:fs";
+import { watch as fsWatch, existsSync, mkdirSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
 const COALESCE_MS = 100;
@@ -32,6 +32,7 @@ export function watch(paths, on_change) {
 
   for (const directory of directories) {
     try {
+      mkdirSync(directory, { recursive: true });
       const watcher = fsWatch(
         directory,
         { recursive: true },

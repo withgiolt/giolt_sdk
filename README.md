@@ -81,7 +81,6 @@ Run with `gleam run -m deploy`.
 ```gleam
 import giolt_sdk/bundle
 import giolt_sdk/dev
-import gleam/result
 
 pub fn main() {
   dev.new()
@@ -89,8 +88,6 @@ pub fn main() {
   |> dev.watch("./public")
   |> dev.prebuild(fn() { Ok(Nil) })
   |> dev.build(fn(_change) {
-    use _ <- result.try(dev.compile())
-
     bundle.new()
     |> bundle.entry("./build/dev/javascript/app/app.mjs")
     |> bundle.static_dir("./public")
@@ -106,5 +103,16 @@ pub fn main() {
 ```
 
 Run with `gleam dev`.
+
+`dev.run` supervises itself: the first process compiles the project and then
+spawns a child that runs your `build` closure, watches and serves. On a file
+change the child exits, the parent recompiles and starts a fresh child. That
+restart is what makes the `build` closure see newly compiled code — a
+long-lived process holds its imported modules in memory, so anything that
+generates output in-process (a static site generator, codegen, templating)
+would otherwise keep rendering from the code that was loaded at startup.
+
+Because the supervisor compiles before every child, your `build` closure does
+not need to compile the project itself.
 
 Documentation can be found at [docs.giolt.com](https://docs.giolt.com).
