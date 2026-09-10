@@ -75,7 +75,7 @@ async function serveStatic(staticDir, method, urlPath, res) {
   const contentType = MIME_TYPES[extname(filePath)] ?? "application/octet-stream";
   const body = await readFile(filePath);
 
-  res.writeHead(200, { "content-type": contentType });
+  res.writeHead(200, { "content-type": contentType, "cache-control": "no-store" });
   res.end(
     contentType.startsWith("text/html")
       ? injectLiveReload(body.toString("utf-8"))
