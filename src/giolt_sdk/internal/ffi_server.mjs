@@ -123,7 +123,7 @@ async function serveWorker(workerPath, req, res) {
       ? undefined
       : await readRequestBody(req);
 
-  const request = new Request(`http://127.0.0.1${req.url}`, {
+  const request = new Request(`http://localhost${req.url}`, {
     method: req.method,
     headers: req.headers,
     body,
@@ -178,6 +178,6 @@ export function serve(port, staticDir, workerPath, liveReload) {
   });
 
   server.listen(port, () => {
-    console.log(`[Giolt SDK] Dev server listening on http://127.0.0.1:${port}`);
+    console.log(`[Giolt SDK] Dev server listening on http://localhost:${port}`);
   });
 }
