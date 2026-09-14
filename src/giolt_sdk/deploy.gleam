@@ -1,6 +1,14 @@
 import giolt_sdk/bundle
 import giolt_sdk/internal/io
+import gleam/bit_array
+import gleam/dynamic/decode
+import gleam/fetch
+import gleam/http
+import gleam/http/request
+import gleam/http/response
 import gleam/javascript/promise.{type Promise}
+import gleam/json
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
@@ -43,6 +51,7 @@ pub type Error {
   MissingToken(env_var: String)
   ArtifactNotFound(path: String)
   ArtifactEmpty(path: String)
+  CannotReadArtifact(path: String)
   NotImplemented(detail: String)
   ApiError(status: Int, body: String)
 }
@@ -60,9 +69,17 @@ pub type Plan {
 
 const default_token_env = "GIOLT_TOKEN"
 
-const default_api_url = "https://api.giolt.com"
+const default_api_url = "https://giolt.com"
 
 const default_artifact_dir = "./dist"
+
+/// Overrides `deploy.api_url` when set — handy for pointing a deploy at a
+/// local dev server without editing the scaffolded `deploy.gleam`.
+const api_url_env = "GIOLT_API_URL"
+
+/// Files under this directory (relative to the artifact dir) are uploaded as
+/// static assets; everything else is uploaded as a worker module.
+const static_subdir = "static"
 
 pub fn new() -> Config(NoProjectId, NoArtifact) {
   Config(
@@ -150,18 +167,26 @@ pub fn api_url(
 pub fn run(
   config: Config(HasProjectId, HasArtifact),
 ) -> Promise(Result(Deployment, Error)) {
-  let result = {
+  let plan_result = {
     use plan <- result.try(plan(config, lookup_env))
     use _ <- result.try(check_artifact(plan.artifact_dir))
-    submit(plan)
+    Ok(plan)
   }
 
-  case result {
-    Ok(_) -> Nil
-    Error(error) -> io.println_error(describe_error(error))
+  case plan_result {
+    Error(error) -> {
+      io.println_error(describe_error(error))
+      promise.resolve(Error(error))
+    }
+    Ok(plan) -> {
+      use result <- promise.map(submit(plan))
+      case result {
+        Ok(_) -> Nil
+        Error(error) -> io.println_error(describe_error(error))
+      }
+      result
+    }
   }
-
-  promise.resolve(result)
 }
 
 pub fn plan(
@@ -176,7 +201,7 @@ pub fn plan(
     preview: config.preview,
     token: token,
     message: config.message,
-    api_url: config.api_url,
+    api_url: lookup_env(api_url_env) |> result.unwrap(config.api_url),
   ))
 }
 
@@ -221,7 +246,7 @@ fn check_artifact(path: String) -> Result(Nil, Error) {
   }
 }
 
-fn submit(plan: Plan) -> Result(Deployment, Error) {
+fn submit(plan: Plan) -> Promise(Result(Deployment, Error)) {
   io.println_info(
     "Deploying "
     <> plan.artifact_dir
@@ -234,8 +259,136 @@ fn submit(plan: Plan) -> Result(Deployment, Error) {
     <> "...",
   )
 
-  // TODO: send `plan` to `{plan.api_url}` and return a real `Deployment`.
-  Error(NotImplemented("giolt_sdk/deploy does not talk to the Giolt API yet."))
+  case artifact_files(plan.artifact_dir) {
+    Error(error) -> promise.resolve(Error(error))
+    Ok(#(modules, assets)) -> post_deploy(plan, modules, assets)
+  }
+}
+
+/// Reads every file under `dir`, splitting it into worker modules and static
+/// assets (files under `dir/static`). Each entry is `#(path, content_base64)`,
+/// with `path` relative to `dir` for modules and relative to `dir/static` for
+/// assets — matching what `/api/deploy` expects.
+pub fn artifact_files(
+  dir: String,
+) -> Result(#(List(#(String, String)), List(#(String, String))), Error) {
+  use paths <- result.try(
+    simplifile.get_files(dir) |> result.replace_error(CannotReadArtifact(dir)),
+  )
+
+  let dir_prefix = strip_trailing_slash(dir) <> "/"
+  let static_prefix = dir_prefix <> static_subdir <> "/"
+
+  let #(asset_paths, module_paths) =
+    list.partition(paths, string.starts_with(_, static_prefix))
+
+  use modules <- result.try(read_and_encode(module_paths, dir_prefix))
+  use assets <- result.try(read_and_encode(asset_paths, static_prefix))
+
+  Ok(#(modules, assets))
+}
+
+fn read_and_encode(
+  paths: List(String),
+  prefix: String,
+) -> Result(List(#(String, String)), Error) {
+  list.try_map(paths, fn(path) {
+    use content <- result.try(
+      simplifile.read_bits(path)
+      |> result.replace_error(CannotReadArtifact(path)),
+    )
+    Ok(#(
+      string.drop_start(path, string.length(prefix)),
+      bit_array.base64_encode(content, True),
+    ))
+  })
+}
+
+fn strip_trailing_slash(path: String) -> String {
+  case string.ends_with(path, "/") {
+    True -> string.drop_end(path, 1)
+    False -> path
+  }
+}
+
+fn post_deploy(
+  plan: Plan,
+  modules: List(#(String, String)),
+  assets: List(#(String, String)),
+) -> Promise(Result(Deployment, Error)) {
+  case request.to(plan.api_url <> "/api/deploy") {
+    Error(Nil) ->
+      promise.resolve(Error(ApiError(0, "Invalid api_url: " <> plan.api_url)))
+    Ok(base_request) -> {
+      let req =
+        base_request
+        |> request.set_method(http.Post)
+        |> request.set_header("content-type", "application/json")
+        |> request.set_header("authorization", "Bearer " <> plan.token)
+        |> request.set_body(
+          json.object([
+            #("preview", json.bool(plan.preview)),
+            #("modules", json.array(modules, file_json)),
+            #("assets", json.array(assets, file_json)),
+          ])
+          |> json.to_string,
+        )
+
+      use send_result <- promise.await(fetch.send(req))
+
+      case send_result {
+        Error(fetch_error) ->
+          promise.resolve(Error(ApiError(0, string.inspect(fetch_error))))
+        Ok(res) -> handle_response(res)
+      }
+    }
+  }
+}
+
+fn file_json(file: #(String, String)) -> json.Json {
+  let #(path, content_base64) = file
+  json.object([
+    #("path", json.string(path)),
+    #("content_base64", json.string(content_base64)),
+  ])
+}
+
+fn handle_response(
+  res: response.Response(fetch.FetchBody),
+) -> Promise(Result(Deployment, Error)) {
+  case res.status {
+    200 -> {
+      use body_result <- promise.await(fetch.read_json_body(res))
+      case body_result {
+        Error(fetch_error) ->
+          promise.resolve(
+            Error(ApiError(res.status, string.inspect(fetch_error))),
+          )
+        Ok(json_res) ->
+          decode.run(json_res.body, deployment_decoder())
+          |> result.replace_error(ApiError(
+            res.status,
+            "Malformed response body",
+          ))
+          |> promise.resolve
+      }
+    }
+    status -> {
+      use body_result <- promise.await(fetch.read_text_body(res))
+      let body = case body_result {
+        Ok(text_res) -> text_res.body
+        Error(_) -> ""
+      }
+      promise.resolve(Error(ApiError(status, body)))
+    }
+  }
+}
+
+fn deployment_decoder() -> decode.Decoder(Deployment) {
+  use id <- decode.field("id", decode.string)
+  use url <- decode.field("url", decode.string)
+  use preview <- decode.field("preview", decode.bool)
+  decode.success(Deployment(id:, url:, preview:))
 }
 
 pub fn describe_error(error: Error) -> String {
@@ -251,6 +404,8 @@ pub fn describe_error(error: Error) -> String {
       <> ". Run your build first, or pass its `bundle.Output` to `deploy.from`."
 
     ArtifactEmpty(path) -> "The artifact directory " <> path <> " is empty."
+
+    CannotReadArtifact(path) -> "Could not read artifact file: " <> path
 
     NotImplemented(detail) -> detail
 

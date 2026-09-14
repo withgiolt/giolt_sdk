@@ -33,7 +33,7 @@ pub fn main() {
   deploy.new()
   |> deploy.project_id(\"prj_replace_me\")
   |> deploy.from(output)
-  |> deploy.preview(True)
+  |> deploy.preview(False)
   |> deploy.token_from_env(\"GIOLT_TOKEN\")
   |> deploy.run
   |> promise.map(deploy.print_result)
