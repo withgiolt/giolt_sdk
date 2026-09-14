@@ -1,65 +1,60 @@
+import envie
 import giolt_sdk/bundle
 import giolt_sdk/deploy
 import gleam/bit_array
-import gleam/list
 import gleam/option
 import gleam/string
 import simplifile
 
-fn no_env(_var: String) -> Result(String, Nil) {
-  Error(Nil)
-}
-
-fn stub_env(
-  vars: List(#(String, String)),
-) -> fn(String) -> Result(String, Nil) {
-  fn(var) { list.key_find(vars, var) }
-}
-
 pub fn plan_missing_token_test() {
+  envie.unset("GIOLT_TOKEN")
+
   let config =
     deploy.new()
     |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
 
-  assert deploy.plan(config, no_env)
-    == Error(deploy.MissingToken("GIOLT_TOKEN"))
+  assert deploy.plan(config) == Error(deploy.MissingToken("GIOLT_TOKEN"))
 }
 
 pub fn plan_resolves_token_from_env_test() {
+  envie.unset("GIOLT_API_URL")
+
   let config =
     deploy.new()
     |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
 
-  let lookup = stub_env([#("GIOLT_TOKEN", "secret")])
+  envie.set("GIOLT_TOKEN", "secret")
 
-  assert deploy.plan(config, lookup)
+  assert deploy.plan(config)
     == Ok(deploy.Plan(
       project_id: "prj_123",
       artifact_dir: "./dist",
       preview: False,
       token: "secret",
       message: option.None,
-      api_url: "https://api.giolt.com",
+      api_url: "https://giolt.com",
     ))
 }
 
 pub fn plan_uses_explicit_token_test() {
+  envie.unset("GIOLT_API_URL")
+
   let config =
     deploy.new()
     |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
     |> deploy.token("explicit-token")
 
-  assert deploy.plan(config, no_env)
+  assert deploy.plan(config)
     == Ok(deploy.Plan(
       project_id: "prj_123",
       artifact_dir: "./dist",
       preview: False,
       token: "explicit-token",
       message: option.None,
-      api_url: "https://api.giolt.com",
+      api_url: "https://giolt.com",
     ))
 }
 
@@ -70,11 +65,10 @@ pub fn plan_custom_token_env_var_test() {
     |> deploy.artifact("./dist")
     |> deploy.token_from_env("CUSTOM_TOKEN")
 
-  assert deploy.plan(config, no_env)
-    == Error(deploy.MissingToken("CUSTOM_TOKEN"))
+  assert deploy.plan(config) == Error(deploy.MissingToken("CUSTOM_TOKEN"))
 
-  let lookup = stub_env([#("CUSTOM_TOKEN", "abc")])
-  let assert Ok(plan) = deploy.plan(config, lookup)
+  envie.set("CUSTOM_TOKEN", "abc")
+  let assert Ok(plan) = deploy.plan(config)
   assert plan.token == "abc"
 }
 
@@ -85,8 +79,8 @@ pub fn plan_carries_preview_flag_test() {
     |> deploy.artifact("./dist")
     |> deploy.preview(True)
 
-  let lookup = stub_env([#("GIOLT_TOKEN", "secret")])
-  let assert Ok(plan) = deploy.plan(config, lookup)
+  envie.set("GIOLT_TOKEN", "secret")
+  let assert Ok(plan) = deploy.plan(config)
 
   assert plan.preview == True
 }
@@ -98,21 +92,23 @@ pub fn plan_carries_message_test() {
     |> deploy.artifact("./dist")
     |> deploy.message("release notes")
 
-  let lookup = stub_env([#("GIOLT_TOKEN", "secret")])
-  let assert Ok(plan) = deploy.plan(config, lookup)
+  envie.set("GIOLT_TOKEN", "secret")
+  let assert Ok(plan) = deploy.plan(config)
 
   assert plan.message == option.Some("release notes")
 }
 
 pub fn plan_carries_custom_api_url_test() {
+  envie.unset("GIOLT_API_URL")
+
   let config =
     deploy.new()
     |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
     |> deploy.api_url("https://staging.giolt.com")
 
-  let lookup = stub_env([#("GIOLT_TOKEN", "secret")])
-  let assert Ok(plan) = deploy.plan(config, lookup)
+  envie.set("GIOLT_TOKEN", "secret")
+  let assert Ok(plan) = deploy.plan(config)
 
   assert plan.api_url == "https://staging.giolt.com"
 }
@@ -124,12 +120,9 @@ pub fn plan_api_url_env_overrides_configured_url_test() {
     |> deploy.artifact("./dist")
     |> deploy.api_url("https://staging.giolt.com")
 
-  let lookup =
-    stub_env([
-      #("GIOLT_TOKEN", "secret"),
-      #("GIOLT_API_URL", "http://localhost:8787"),
-    ])
-  let assert Ok(plan) = deploy.plan(config, lookup)
+  envie.set("GIOLT_TOKEN", "secret")
+  envie.set("GIOLT_API_URL", "http://localhost:8787")
+  let assert Ok(plan) = deploy.plan(config)
 
   assert plan.api_url == "http://localhost:8787"
 }
@@ -147,8 +140,8 @@ pub fn plan_from_bundle_output_uses_its_outdir_test() {
     |> deploy.project_id("prj_123")
     |> deploy.from(output)
 
-  let lookup = stub_env([#("GIOLT_TOKEN", "secret")])
-  let assert Ok(plan) = deploy.plan(config, lookup)
+  envie.set("GIOLT_TOKEN", "secret")
+  let assert Ok(plan) = deploy.plan(config)
 
   assert plan.artifact_dir == "./build-output"
 }
@@ -189,10 +182,7 @@ pub fn artifact_files_splits_modules_from_static_assets_test() {
 
   assert modules
     == [
-      #(
-        "index.mjs",
-        bit_array.base64_encode(<<"console.log(1)":utf8>>, True),
-      ),
+      #("index.mjs", bit_array.base64_encode(<<"console.log(1)":utf8>>, True)),
     ]
   assert assets
     == [#("sub/x.css", bit_array.base64_encode(<<"body{}":utf8>>, True))]
