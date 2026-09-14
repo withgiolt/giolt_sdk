@@ -1,3 +1,4 @@
+import envie
 import giolt_sdk/bundle
 import giolt_sdk/internal/io
 import gleam/bit_array
@@ -168,7 +169,7 @@ pub fn run(
   config: Config(HasProjectId, HasArtifact),
 ) -> Promise(Result(Deployment, Error)) {
   let plan_result = {
-    use plan <- result.try(plan(config, lookup_env))
+    use plan <- result.try(plan(config))
     use _ <- result.try(check_artifact(plan.artifact_dir))
     Ok(plan)
   }
@@ -189,11 +190,8 @@ pub fn run(
   }
 }
 
-pub fn plan(
-  config: Config(HasProjectId, HasArtifact),
-  lookup_env: fn(String) -> Result(String, Nil),
-) -> Result(Plan, Error) {
-  use token <- result.try(resolve_token(config.token, lookup_env))
+pub fn plan(config: Config(HasProjectId, HasArtifact)) -> Result(Plan, Error) {
+  use token <- result.try(resolve_token(config.token))
 
   Ok(Plan(
     project_id: config.project_id,
@@ -201,7 +199,7 @@ pub fn plan(
     preview: config.preview,
     token: token,
     message: config.message,
-    api_url: lookup_env(api_url_env) |> result.unwrap(config.api_url),
+    api_url: envie.get_string(api_url_env, config.api_url),
   ))
 }
 
@@ -213,18 +211,13 @@ fn artifact_dir(artifact: Option(Artifact)) -> String {
   }
 }
 
-fn resolve_token(
-  source: TokenSource,
-  lookup_env: fn(String) -> Result(String, Nil),
-) -> Result(String, Error) {
+fn resolve_token(source: TokenSource) -> Result(String, Error) {
   case source {
     Explicit(value) -> Ok(value)
-    FromEnv(var) -> lookup_env(var) |> result.replace_error(MissingToken(var))
+    FromEnv(var) ->
+      envie.require_string(var) |> result.replace_error(MissingToken(var))
   }
 }
-
-@external(javascript, "./internal/ffi_env.mjs", "get_env")
-fn lookup_env(var: String) -> Result(String, Nil)
 
 fn check_artifact(path: String) -> Result(Nil, Error) {
   use is_dir <- result.try(

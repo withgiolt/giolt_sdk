@@ -8,6 +8,7 @@
 
 packages = [
   { name = "conversation", version = "2.0.2", build_tools = ["gleam"], requirements = ["gleam_http", "gleam_javascript", "gleam_stdlib"], otp_app = "conversation", source = "hex", outer_checksum = "60AFB424A723D5B29925487BCA66FF09EB157FD3EF72AF072714FEC903701226" },
+  { name = "envie", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "envie", source = "hex", outer_checksum = "E7EBA39310F32A40BF3EDDD7CD9C7A2BC289909983D357411C22873415BC322A" },
   { name = "filepath", version = "1.1.2", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "filepath", source = "hex", outer_checksum = "B06A9AF0BF10E51401D64B98E4B627F1D2E48C154967DA7AF4D0914780A6D40A" },
   { name = "gleam_fetch", version = "1.4.1", build_tools = ["gleam"], requirements = ["gleam_http", "gleam_javascript", "gleam_stdlib"], otp_app = "gleam_fetch", source = "hex", outer_checksum = "D84CEF8A60EC69F40BC5B7191E24E9674D79852006A43E48F0C35744690F12A2" },
   { name = "gleam_http", version = "4.4.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_http", source = "hex", outer_checksum = "F065CE9941A7756ABBAEAE7F9F32A96CAD29DA3311A381DB2D926EA8E8C156DC" },
@@ -21,6 +22,7 @@ packages = [
 
 [requirements]
 conversation = { version = ">= 2.0.2 and < 3.0.0" }
+envie = { version = ">= 1.2.0 and < 2.0.0" }
 filepath = { version = ">= 1.1.2 and < 2.0.0" }
 gleam_fetch = { version = ">= 1.4.1 and < 2.0.0" }
 gleam_http = { version = ">= 4.4.0 and < 5.0.0" }
