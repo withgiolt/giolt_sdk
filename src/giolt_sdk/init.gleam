@@ -30,11 +30,9 @@ fn scaffold(project_name: String) -> Nil {
 
   io.println_info(
     "Next steps:\n"
-    <> "  gleam run -m build                     bundle your app\n"
-    <> "  gleam run -m deploy                     deploy it\n"
-    <> "  gleam run -m "
-    <> templates.dev_module(project_name)
-    <> "               run it locally, with rebuild on change",
+    <> "  gleam run -m build      bundle your app\n"
+    <> "  gleam run -m deploy     deploy it\n"
+    <> "  gleam dev               run it locally, with rebuild on change",
   )
 }
 
