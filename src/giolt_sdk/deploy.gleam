@@ -15,10 +15,6 @@ import gleam/result
 import gleam/string
 import simplifile
 
-pub type NoProjectId
-
-pub type HasProjectId
-
 pub type NoArtifact
 
 pub type HasArtifact
@@ -33,9 +29,8 @@ type TokenSource {
   FromEnv(var: String)
 }
 
-pub opaque type Config(has_project_id, has_artifact) {
+pub opaque type Config(has_artifact) {
   Config(
-    project_id: String,
     artifact: Option(Artifact),
     preview: Bool,
     token: TokenSource,
@@ -59,7 +54,6 @@ pub type Error {
 
 pub type Plan {
   Plan(
-    project_id: String,
     artifact_dir: String,
     preview: Bool,
     token: String,
@@ -82,9 +76,8 @@ const api_url_env = "GIOLT_API_URL"
 /// static assets; everything else is uploaded as a worker module.
 const static_subdir = "static"
 
-pub fn new() -> Config(NoProjectId, NoArtifact) {
+pub fn new() -> Config(NoArtifact) {
   Config(
-    project_id: "",
     artifact: None,
     preview: False,
     token: FromEnv(default_token_env),
@@ -93,81 +86,64 @@ pub fn new() -> Config(NoProjectId, NoArtifact) {
   )
 }
 
-pub fn project_id(
-  config: Config(has_project_id, has_artifact),
-  id: String,
-) -> Config(HasProjectId, has_artifact) {
-  let Config(artifact:, preview:, token:, message:, api_url:, ..) = config
-  Config(project_id: id, artifact:, preview:, token:, message:, api_url:)
-}
-
 pub fn artifact(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   path: String,
-) -> Config(has_project_id, HasArtifact) {
+) -> Config(HasArtifact) {
   set_artifact(config, Directory(path))
 }
 
 pub fn from(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   output: bundle.Output,
-) -> Config(has_project_id, HasArtifact) {
+) -> Config(HasArtifact) {
   set_artifact(config, FromBundle(output))
 }
 
 fn set_artifact(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   artifact: Artifact,
-) -> Config(has_project_id, HasArtifact) {
-  let Config(project_id:, preview:, token:, message:, api_url:, ..) = config
-  Config(
-    project_id:,
-    artifact: Some(artifact),
-    preview:,
-    token:,
-    message:,
-    api_url:,
-  )
+) -> Config(HasArtifact) {
+  let Config(preview:, token:, message:, api_url:, ..) = config
+  Config(artifact: Some(artifact), preview:, token:, message:, api_url:)
 }
 
 pub fn preview(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   is_preview: Bool,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, preview: is_preview)
 }
 
 pub fn token(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   value: String,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, token: Explicit(value))
 }
 
 pub fn token_from_env(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   var: String,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, token: FromEnv(var))
 }
 
 pub fn message(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   text: String,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, message: Some(text))
 }
 
 pub fn api_url(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   url: String,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, api_url: url)
 }
 
-pub fn run(
-  config: Config(HasProjectId, HasArtifact),
-) -> Promise(Result(Deployment, Error)) {
+pub fn run(config: Config(HasArtifact)) -> Promise(Result(Deployment, Error)) {
   let plan_result = {
     use plan <- result.try(plan(config))
     use _ <- result.try(check_artifact(plan.artifact_dir))
@@ -190,11 +166,10 @@ pub fn run(
   }
 }
 
-pub fn plan(config: Config(HasProjectId, HasArtifact)) -> Result(Plan, Error) {
+pub fn plan(config: Config(HasArtifact)) -> Result(Plan, Error) {
   use token <- result.try(resolve_token(config.token))
 
   Ok(Plan(
-    project_id: config.project_id,
     artifact_dir: artifact_dir(config.artifact),
     preview: config.preview,
     token: token,
@@ -243,8 +218,6 @@ fn submit(plan: Plan) -> Promise(Result(Deployment, Error)) {
   io.println_info(
     "Deploying "
     <> plan.artifact_dir
-    <> " to project "
-    <> plan.project_id
     <> case plan.preview {
       True -> " (preview)"
       False -> ""

@@ -11,7 +11,6 @@ pub fn plan_missing_token_test() {
 
   let config =
     deploy.new()
-    |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
 
   assert deploy.plan(config) == Error(deploy.MissingToken("GIOLT_TOKEN"))
@@ -22,14 +21,12 @@ pub fn plan_resolves_token_from_env_test() {
 
   let config =
     deploy.new()
-    |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
 
   envie.set("GIOLT_TOKEN", "secret")
 
   assert deploy.plan(config)
     == Ok(deploy.Plan(
-      project_id: "prj_123",
       artifact_dir: "./dist",
       preview: False,
       token: "secret",
@@ -43,13 +40,11 @@ pub fn plan_uses_explicit_token_test() {
 
   let config =
     deploy.new()
-    |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
     |> deploy.token("explicit-token")
 
   assert deploy.plan(config)
     == Ok(deploy.Plan(
-      project_id: "prj_123",
       artifact_dir: "./dist",
       preview: False,
       token: "explicit-token",
@@ -61,7 +56,6 @@ pub fn plan_uses_explicit_token_test() {
 pub fn plan_custom_token_env_var_test() {
   let config =
     deploy.new()
-    |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
     |> deploy.token_from_env("CUSTOM_TOKEN")
 
@@ -75,7 +69,6 @@ pub fn plan_custom_token_env_var_test() {
 pub fn plan_carries_preview_flag_test() {
   let config =
     deploy.new()
-    |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
     |> deploy.preview(True)
 
@@ -88,7 +81,6 @@ pub fn plan_carries_preview_flag_test() {
 pub fn plan_carries_message_test() {
   let config =
     deploy.new()
-    |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
     |> deploy.message("release notes")
 
@@ -103,7 +95,6 @@ pub fn plan_carries_custom_api_url_test() {
 
   let config =
     deploy.new()
-    |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
     |> deploy.api_url("https://staging.giolt.com")
 
@@ -116,7 +107,6 @@ pub fn plan_carries_custom_api_url_test() {
 pub fn plan_api_url_env_overrides_configured_url_test() {
   let config =
     deploy.new()
-    |> deploy.project_id("prj_123")
     |> deploy.artifact("./dist")
     |> deploy.api_url("https://staging.giolt.com")
 
@@ -137,7 +127,6 @@ pub fn plan_from_bundle_output_uses_its_outdir_test() {
 
   let config =
     deploy.new()
-    |> deploy.project_id("prj_123")
     |> deploy.from(output)
 
   envie.set("GIOLT_TOKEN", "secret")
