@@ -64,7 +64,7 @@ pub type Plan {
 
 const default_token_env = "GIOLT_TOKEN"
 
-const default_api_url = "https://giolt.com"
+const default_api_url = "https://dash.giolt.com"
 
 const default_artifact_dir = "./dist"
 

@@ -31,7 +31,7 @@ pub fn plan_resolves_token_from_env_test() {
       preview: False,
       token: "secret",
       message: option.None,
-      api_url: "https://giolt.com",
+      api_url: "https://dash.giolt.com",
     ))
 }
 
@@ -49,7 +49,7 @@ pub fn plan_uses_explicit_token_test() {
       preview: False,
       token: "explicit-token",
       message: option.None,
-      api_url: "https://giolt.com",
+      api_url: "https://dash.giolt.com",
     ))
 }
 
