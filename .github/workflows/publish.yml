@@ -20,7 +20,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "28"
-          gleam-version: "1.18"
+          gleam-version: "1.19"
 
       - name: Cache Gleam build
         uses: actions/cache@v4
