@@ -33,6 +33,7 @@ pub opaque type Config(has_artifact) {
   Config(
     artifact: Option(Artifact),
     preview: Bool,
+    spa: Bool,
     token: TokenSource,
     message: Option(String),
     api_url: String,
@@ -56,6 +57,7 @@ pub type Plan {
   Plan(
     artifact_dir: String,
     preview: Bool,
+    spa: Bool,
     token: String,
     message: Option(String),
     api_url: String,
@@ -80,6 +82,7 @@ pub fn new() -> Config(NoArtifact) {
   Config(
     artifact: None,
     preview: False,
+    spa: False,
     token: FromEnv(default_token_env),
     message: None,
     api_url: default_api_url,
@@ -104,8 +107,8 @@ fn set_artifact(
   config: Config(has_artifact),
   artifact: Artifact,
 ) -> Config(HasArtifact) {
-  let Config(preview:, token:, message:, api_url:, ..) = config
-  Config(artifact: Some(artifact), preview:, token:, message:, api_url:)
+  let Config(preview:, spa:, token:, message:, api_url:, ..) = config
+  Config(artifact: Some(artifact), preview:, spa:, token:, message:, api_url:)
 }
 
 pub fn preview(
@@ -113,6 +116,13 @@ pub fn preview(
   is_preview: Bool,
 ) -> Config(has_artifact) {
   Config(..config, preview: is_preview)
+}
+
+/// Serves `index.html` for any path that matches no file, so client-side
+/// routes survive a refresh or deep link. Only valid for a static-only
+/// artifact: Giolt rejects it alongside worker modules.
+pub fn spa(config: Config(has_artifact), is_spa: Bool) -> Config(has_artifact) {
+  Config(..config, spa: is_spa)
 }
 
 pub fn token(
@@ -172,6 +182,7 @@ pub fn plan(config: Config(HasArtifact)) -> Result(Plan, Error) {
   Ok(Plan(
     artifact_dir: artifact_dir(config.artifact),
     preview: config.preview,
+    spa: config.spa,
     token: token,
     message: config.message,
     api_url: envie.get_string(api_url_env, config.api_url),
@@ -294,6 +305,7 @@ fn post_deploy(
         |> request.set_body(
           json.object([
             #("preview", json.bool(plan.preview)),
+            #("spa", json.bool(plan.spa)),
             #("modules", json.array(modules, file_json)),
             #("assets", json.array(assets, file_json)),
           ])

@@ -12,7 +12,8 @@ pub fn dev_module(project: String) -> String {
   project <> "_dev"
 }
 
-const build_template = "import giolt_sdk/bundle
+const build_template =
+  "import giolt_sdk/bundle
 
 pub fn main() {
   bundle.new()
@@ -23,7 +24,8 @@ pub fn main() {
 }
 "
 
-const deploy_template = "import build
+const deploy_template =
+  "import build
 import giolt_sdk/deploy
 import gleam/javascript/promise
 
@@ -39,7 +41,8 @@ pub fn main() {
 }
 "
 
-const dev_template = "import giolt_sdk/bundle
+const dev_template =
+  "import giolt_sdk/bundle
 import giolt_sdk/dev
 
 pub fn main() {
