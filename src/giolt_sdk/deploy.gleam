@@ -15,10 +15,6 @@ import gleam/result
 import gleam/string
 import simplifile
 
-pub type NoProjectId
-
-pub type HasProjectId
-
 pub type NoArtifact
 
 pub type HasArtifact
@@ -33,9 +29,8 @@ type TokenSource {
   FromEnv(var: String)
 }
 
-pub opaque type Config(has_project_id, has_artifact) {
+pub opaque type Config(has_artifact) {
   Config(
-    project_id: String,
     artifact: Option(Artifact),
     preview: Bool,
     spa: Bool,
@@ -60,7 +55,6 @@ pub type Error {
 
 pub type Plan {
   Plan(
-    project_id: String,
     artifact_dir: String,
     preview: Bool,
     spa: Bool,
@@ -72,7 +66,7 @@ pub type Plan {
 
 const default_token_env = "GIOLT_TOKEN"
 
-const default_api_url = "https://giolt.com"
+const default_api_url = "https://dash.giolt.com"
 
 const default_artifact_dir = "./dist"
 
@@ -84,9 +78,8 @@ const api_url_env = "GIOLT_API_URL"
 /// static assets; everything else is uploaded as a worker module.
 const static_subdir = "static"
 
-pub fn new() -> Config(NoProjectId, NoArtifact) {
+pub fn new() -> Config(NoArtifact) {
   Config(
-    project_id: "",
     artifact: None,
     preview: False,
     spa: False,
@@ -96,93 +89,71 @@ pub fn new() -> Config(NoProjectId, NoArtifact) {
   )
 }
 
-pub fn project_id(
-  config: Config(has_project_id, has_artifact),
-  id: String,
-) -> Config(HasProjectId, has_artifact) {
-  let Config(artifact:, preview:, spa:, token:, message:, api_url:, ..) = config
-  Config(project_id: id, artifact:, preview:, spa:, token:, message:, api_url:)
-}
-
 pub fn artifact(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   path: String,
-) -> Config(has_project_id, HasArtifact) {
+) -> Config(HasArtifact) {
   set_artifact(config, Directory(path))
 }
 
 pub fn from(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   output: bundle.Output,
-) -> Config(has_project_id, HasArtifact) {
+) -> Config(HasArtifact) {
   set_artifact(config, FromBundle(output))
 }
 
 fn set_artifact(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   artifact: Artifact,
-) -> Config(has_project_id, HasArtifact) {
-  let Config(project_id:, preview:, spa:, token:, message:, api_url:, ..) =
-    config
-  Config(
-    project_id:,
-    artifact: Some(artifact),
-    preview:,
-    spa:,
-    token:,
-    message:,
-    api_url:,
-  )
+) -> Config(HasArtifact) {
+  let Config(preview:, spa:, token:, message:, api_url:, ..) = config
+  Config(artifact: Some(artifact), preview:, spa:, token:, message:, api_url:)
 }
 
 pub fn preview(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   is_preview: Bool,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, preview: is_preview)
 }
 
 /// Serves `index.html` for any path that matches no file, so client-side
 /// routes survive a refresh or deep link. Only valid for a static-only
 /// artifact: Giolt rejects it alongside worker modules.
-pub fn spa(
-  config: Config(has_project_id, has_artifact),
-  is_spa: Bool,
-) -> Config(has_project_id, has_artifact) {
+pub fn spa(config: Config(has_artifact), is_spa: Bool) -> Config(has_artifact) {
   Config(..config, spa: is_spa)
 }
 
 pub fn token(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   value: String,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, token: Explicit(value))
 }
 
 pub fn token_from_env(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   var: String,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, token: FromEnv(var))
 }
 
 pub fn message(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   text: String,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, message: Some(text))
 }
 
 pub fn api_url(
-  config: Config(has_project_id, has_artifact),
+  config: Config(has_artifact),
   url: String,
-) -> Config(has_project_id, has_artifact) {
+) -> Config(has_artifact) {
   Config(..config, api_url: url)
 }
 
-pub fn run(
-  config: Config(HasProjectId, HasArtifact),
-) -> Promise(Result(Deployment, Error)) {
+pub fn run(config: Config(HasArtifact)) -> Promise(Result(Deployment, Error)) {
   let plan_result = {
     use plan <- result.try(plan(config))
     use _ <- result.try(check_artifact(plan.artifact_dir))
@@ -205,11 +176,10 @@ pub fn run(
   }
 }
 
-pub fn plan(config: Config(HasProjectId, HasArtifact)) -> Result(Plan, Error) {
+pub fn plan(config: Config(HasArtifact)) -> Result(Plan, Error) {
   use token <- result.try(resolve_token(config.token))
 
   Ok(Plan(
-    project_id: config.project_id,
     artifact_dir: artifact_dir(config.artifact),
     preview: config.preview,
     spa: config.spa,
@@ -259,8 +229,6 @@ fn submit(plan: Plan) -> Promise(Result(Deployment, Error)) {
   io.println_info(
     "Deploying "
     <> plan.artifact_dir
-    <> " to project "
-    <> plan.project_id
     <> case plan.preview {
       True -> " (preview)"
       False -> ""

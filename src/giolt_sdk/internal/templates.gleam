@@ -31,7 +31,6 @@ pub fn main() {
   let assert Ok(output) = build.main()
 
   deploy.new()
-  |> deploy.project_id(\"prj_replace_me\")
   |> deploy.from(output)
   |> deploy.preview(False)
   |> deploy.token_from_env(\"GIOLT_TOKEN\")
