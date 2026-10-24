@@ -32,6 +32,7 @@ pub fn plan_resolves_token_from_env_test() {
       project_id: "prj_123",
       artifact_dir: "./dist",
       preview: False,
+      spa: False,
       token: "secret",
       message: option.None,
       api_url: "https://giolt.com",
@@ -52,6 +53,7 @@ pub fn plan_uses_explicit_token_test() {
       project_id: "prj_123",
       artifact_dir: "./dist",
       preview: False,
+      spa: False,
       token: "explicit-token",
       message: option.None,
       api_url: "https://giolt.com",
@@ -186,4 +188,18 @@ pub fn artifact_files_splits_modules_from_static_assets_test() {
     ]
   assert assets
     == [#("sub/x.css", bit_array.base64_encode(<<"body{}":utf8>>, True))]
+}
+
+pub fn plan_carries_spa_flag_test() {
+  envie.unset("GIOLT_API_URL")
+
+  let config =
+    deploy.new()
+    |> deploy.project_id("prj_123")
+    |> deploy.artifact("./dist")
+    |> deploy.token("explicit-token")
+    |> deploy.spa(True)
+
+  let assert Ok(plan) = deploy.plan(config)
+  assert plan.spa
 }

@@ -38,6 +38,7 @@ pub opaque type Config(has_project_id, has_artifact) {
     project_id: String,
     artifact: Option(Artifact),
     preview: Bool,
+    spa: Bool,
     token: TokenSource,
     message: Option(String),
     api_url: String,
@@ -62,6 +63,7 @@ pub type Plan {
     project_id: String,
     artifact_dir: String,
     preview: Bool,
+    spa: Bool,
     token: String,
     message: Option(String),
     api_url: String,
@@ -87,6 +89,7 @@ pub fn new() -> Config(NoProjectId, NoArtifact) {
     project_id: "",
     artifact: None,
     preview: False,
+    spa: False,
     token: FromEnv(default_token_env),
     message: None,
     api_url: default_api_url,
@@ -97,8 +100,8 @@ pub fn project_id(
   config: Config(has_project_id, has_artifact),
   id: String,
 ) -> Config(HasProjectId, has_artifact) {
-  let Config(artifact:, preview:, token:, message:, api_url:, ..) = config
-  Config(project_id: id, artifact:, preview:, token:, message:, api_url:)
+  let Config(artifact:, preview:, spa:, token:, message:, api_url:, ..) = config
+  Config(project_id: id, artifact:, preview:, spa:, token:, message:, api_url:)
 }
 
 pub fn artifact(
@@ -119,11 +122,13 @@ fn set_artifact(
   config: Config(has_project_id, has_artifact),
   artifact: Artifact,
 ) -> Config(has_project_id, HasArtifact) {
-  let Config(project_id:, preview:, token:, message:, api_url:, ..) = config
+  let Config(project_id:, preview:, spa:, token:, message:, api_url:, ..) =
+    config
   Config(
     project_id:,
     artifact: Some(artifact),
     preview:,
+    spa:,
     token:,
     message:,
     api_url:,
@@ -135,6 +140,16 @@ pub fn preview(
   is_preview: Bool,
 ) -> Config(has_project_id, has_artifact) {
   Config(..config, preview: is_preview)
+}
+
+/// Serves `index.html` for any path that matches no file, so client-side
+/// routes survive a refresh or deep link. Only valid for a static-only
+/// artifact: Giolt rejects it alongside worker modules.
+pub fn spa(
+  config: Config(has_project_id, has_artifact),
+  is_spa: Bool,
+) -> Config(has_project_id, has_artifact) {
+  Config(..config, spa: is_spa)
 }
 
 pub fn token(
@@ -197,6 +212,7 @@ pub fn plan(config: Config(HasProjectId, HasArtifact)) -> Result(Plan, Error) {
     project_id: config.project_id,
     artifact_dir: artifact_dir(config.artifact),
     preview: config.preview,
+    spa: config.spa,
     token: token,
     message: config.message,
     api_url: envie.get_string(api_url_env, config.api_url),
@@ -321,6 +337,7 @@ fn post_deploy(
         |> request.set_body(
           json.object([
             #("preview", json.bool(plan.preview)),
+            #("spa", json.bool(plan.spa)),
             #("modules", json.array(modules, file_json)),
             #("assets", json.array(assets, file_json)),
           ])
