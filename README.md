@@ -4,9 +4,18 @@
 
 The Giolt SDK for building, developing and deploying Gleam apps on the edge.
 
-There is no CLI. `giolt_sdk` is a library — you write plain Gleam scripts that
-call into it, and you own your own build. The only thing invoked by module
-name is a one-shot scaffolder.
+`giolt_sdk` is a library. You write plain Gleam scripts that call into it, and
+you own your own build.
+
+Version 3.0.0 is the last major release. The package is being replaced by
+`giolt`, a CLI run with `gleam run -m giolt` and configured in `gleam.toml`
+(see [withgiolt/issues#1](https://github.com/withgiolt/issues/issues/1)).
+
+## Upgrading to 3.0.0
+
+The worker entry now calls `handle` instead of `handler`. Rename the export in
+your entry module. A module that only exports `handler` gets a 500 that says
+so.
 
 ## Install
 
