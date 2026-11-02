@@ -1,9 +1,10 @@
-# giolt_sdk
+# giolt
 
-Giolt's tooling for building, deploying and locally developing Gleam apps on
-the Giolt platform: today the `giolt_sdk` library (retired after 3.0.0),
-becoming the `giolt` CLI (withgiolt/issues#1). `target = "javascript"` only —
-there is no Erlang support yet, it's stubbed throughout.
+The `giolt` CLI: builds, runs and deploys Gleam apps on the Giolt platform.
+Consumers run `gleam run -m giolt <command>` (`build`, `dev`, `deploy`) and
+configure it under `[tools.giolt]` in their own `gleam.toml`. The CLI itself
+is a JavaScript-target package run on Bun; it builds consumer projects for
+either target. It was `giolt_sdk` until 3.0.1, now retired on Hex.
 
 ## Settings
 
@@ -52,9 +53,9 @@ One file per kind of code that shows how this repo does it. Copy its shape when 
 
 | To add | Copy |
 |---|---|
-| a public builder module | src/giolt_sdk/bundle.gleam |
-| a pure internal function with its test | src/giolt_sdk/internal/esbuild.gleam, test/esbuild_test.gleam |
-| an FFI file | src/giolt_sdk/internal/ffi_esbuild.mjs |
+| a pure decision function with its test | src/giolt/internal/signature.gleam, test/signature_test.gleam |
+| a CLI command | src/giolt/internal/commands.gleam, src/giolt/internal/cli.gleam |
+| an FFI file | src/giolt/internal/ffi_process.mjs |
 
 ## Enforced rules
 
@@ -65,170 +66,104 @@ One file per kind of code that shows how this repo does it. Copy its shape when 
 
 ## Shape of the thing
 
-Consumers don't run a CLI. They call `gleam run -m giolt_sdk/init`
-(`src/giolt_sdk/init.gleam`) once, which scaffolds three files into their own
-`src/` from templates in `src/giolt_sdk/internal/templates.gleam`:
-
-- `build.gleam` → calls `giolt_sdk/bundle`
-- `deploy.gleam` → calls `giolt_sdk/deploy`
-- `{project}_dev.gleam` → calls `giolt_sdk/dev`
-
-Those three public modules (`src/giolt_sdk/bundle.gleam`,
-`src/giolt_sdk/deploy.gleam`, `src/giolt_sdk/dev.gleam`) are the entire public
-API. Each is an opaque, phantom-typed builder in the `lustre_ssg` style:
-
-```gleam
-pub opaque type Config(has_entry) { Config(...) }
-pub fn new() -> Config(NoEntry)
-pub fn entry(Config(a), String) -> Config(HasEntry)   // flips the phantom
-pub fn run(Config(HasEntry)) -> Result(Output, Error)  // only typechecks once set
-```
-
-A required field missing is a compile error at the call site, not a runtime
-one — `bundle.new() |> bundle.run` does not typecheck. When adding a new
-required setter, follow this pattern rather than adding a runtime check.
-
-## Where the logic actually lives
-
-Every public module is a thin effectful shell. Decisions are pure functions in
-`src/giolt_sdk/internal/`, each with a matching `test/*_test.gleam`:
+`src/giolt.gleam` is the entry: it parses argv with `internal/cli.gleam` and
+hands the command to `internal/commands.gleam`, the one effectful shell that
+reads `gleam.toml`, runs subprocesses and prints. Everything it decides comes
+from a pure function in `src/giolt/internal/`, each with a matching
+`test/*_test.gleam`:
 
 | Module | Owns |
 | --- | --- |
-| `internal/esbuild.gleam` | The esbuild argument list (`Plan -> List(String)`) — no process spawned |
-| `internal/esbuild_bin.gleam` | Installing/running the actual esbuild binary (effectful) |
-| `internal/shim.gleam` | The worker entry template esbuild bundles |
-| `internal/templates.gleam` | The three scaffolded file bodies |
-| `internal/project.gleam` | Reading `name` out of the consumer's `gleam.toml` |
-| `internal/watcher.gleam` + `ffi_watcher.mjs` | Recursive file watching |
-| `internal/server.gleam` + `ffi_server.mjs` | The dev HTTP server (static dir, worker hot-reload, live-reload SSE) |
-| `internal/esgleam/` | Vendored (Apache-2.0, forked) esbuild platform-detection + tarball extraction only — do not add unrelated code here |
+| `cli.gleam` | The command tree (clip) and its flags; `parse` returns `Run`, `Usage` or `Invalid` |
+| `config.gleam` | Reading the target and every `[tools.giolt]` key, with defaults and typed errors |
+| `signature.gleam` | Checking `handle/1` against the JSON from `gleam export package-interface` |
+| `glowvm.gleam` | The generated GlowVM build package: `gleam.toml`, `start/0`, the pack module, the runtime file list |
+| `glowvm_bin.gleam` | Running that build: generate, `gleam run --target erlang -m <pack>`, copy runtime files |
+| `tooling.gleam` | Which tools the Erlang target needs (Erlang/OTP, rebar3) and how to say one is missing |
+| `esbuild.gleam` | The esbuild argument list (`Plan -> List(String)`), no process spawned |
+| `esbuild_bin.gleam` | Installing and running the esbuild binary |
+| `bundle.gleam` | Bundling the compiled entry into `outdir` with the worker shim, plus static assets |
+| `deploy.gleam` | Planning and posting a deploy to the Giolt API |
+| `shim.gleam` | The worker entry template esbuild bundles |
+| `server.gleam` + `ffi_server.mjs` | The dev HTTP server (assets, worker hot reload, live-reload SSE) |
+| `watcher.gleam` + `ffi_watcher.mjs` | Recursive file watching |
+| `process.gleam` + `ffi_process.mjs` | Running subprocesses and shell hooks, probing tools, exiting |
+| `io.gleam` | Styled output and the glitzer progress line |
+| `esgleam/` | Vendored (Apache-2.0, forked) esbuild platform detection and tarball extraction only; do not add unrelated code here |
 
-When changing behavior, change the pure `internal/` function and its test
-first; the public module's job is just to read/write the filesystem and call
-that function.
+When changing behavior, change the pure function and its test first; the shell
+only reads, writes and calls it.
 
 ## Non-negotiables from how this got built
 
-- **No CLI, ever.** Nothing is invoked by `gleam run -m giolt_sdk` (top
-  level) or by any `argv`/`clip`-style flag parsing. The only module-name
-  invocation is `giolt_sdk/init`.
-- **`bundle` never runs `gleam build`.** `bundle.entry` takes a plain path to
-  a JS file (usually compiled Gleam output, but not necessarily) — `bundle.run`
-  only ever reads whatever that path points at, it does not compile the
-  user's Gleam. Don't quietly make `bundle.run` shell out to `gleam build` —
-  that was a deliberate call. `dev` is the one module that compiles, and it
-  does so in its supervisor (see below), not in `bundle`.
-
-- **`dev.run` supervises and restarts; there is no `dev.compile`.** The first
-  process is a supervisor: it runs `gleam build --target javascript`, then
-  spawns itself again with a `--giolt-dev-child` argv flag. The child runs
-  `prebuild`, the `build` closure, the watcher and the server. On a watched
-  change the child writes the change to `build/.giolt-dev-change` and exits
-  with status 75; the supervisor recompiles and spawns a fresh child, which
-  reads that file back so the closure still receives a real `Change`.
-  This exists because a long-lived process freezes its imported modules at
-  startup: a `build` closure that generates output **in-process** (lustre_ssg,
-  codegen, templating) would keep rendering from the code loaded when the
-  process began, even though `gleam build` had just written fresh JS to disk.
-  Subprocess steps (esbuild via `esbuild_bin`) never had this problem, which
-  is why it presented as "static pages stale, worker routes fine". Don't
-  reintroduce an in-process rebuild loop, and don't add a public `compile`
-  back — the supervisor compiling before every child is what makes the
-  closure correct.
-
-- **`dev` passes the child marker as an argv flag and the change handoff as a
-  file, not through `process.env`.** Bun is the supported runtime
-  (`gleam run --runtime bun`); Deno is not supported.
-- **`bundle.entry` is a path, not a module name.** It used to take a Gleam
-  module name and resolve it under `./build/dev/javascript/...` itself; it no
-  longer does that resolution. The scaffolded templates bake the default
-  compiled path in as a literal string
-  (`./build/dev/javascript/{name}/{name}.mjs`) at scaffold time. This is what
-  lets `dev.gleam`'s `build` closure point `bundle.entry` at any JS file, not
-  just the project's own default Gleam entry module — including a file the
-  user already ran their own esbuild over.
+- **The user's module exports `handle` on both targets.** JavaScript:
+  `fn(Request(conversation.RequestBody)) -> Response(conversation.ResponseBody)`
+  or a `Promise` of that. Erlang: `fn(wisp.Request) -> wisp.Response`. There is
+  no `handler` fallback, no user-written `start/0` and no direct
+  `glowvm.serve`. `giolt build` checks this from the package interface, and the
+  worker shim still checks at request time.
+- **The generated `start/0` calls the handler through a lambda**
+  (`glowvm.serve(fn(req) { user.handle(req) })`). Passing `user.handle` by
+  reference compiles to an external fun literal, which the packer's pruning
+  does not follow, so the user's modules are silently dropped. A test covers
+  this; keep it.
+- **GlowVM builds happen in a generated package**, `build/.giolt/glowvm`, that
+  depends on the user's project by path, so the user does not need `glowvm` as
+  a direct dependency. The Erlang-target helper is run from the JavaScript CLI
+  with `gleam run --target erlang -m <helper>`. The user's machine needs
+  Erlang/OTP and rebar3, and `giolt build` says so before doing any work.
+- **`bundle.run` never runs `gleam build`; `commands.gleam` does.** `bundle`
+  takes a plain path to a JS file and only reads it. Don't make it shell out.
+- **`dev` rebuilds in-process.** Every build step is a subprocess (gleam,
+  esbuild, the `prebuild` hook), so there is no stale-module problem and no
+  supervisor. The dev server reloads the worker from a per-version copy of the
+  bundle, because Bun ignores the query string when caching ES modules.
 - **`bundle.run` only checks that the entry file exists, not its contents.**
-  There used to be a regex-based static check (`internal/entry.gleam`, since
-  deleted) that scanned the compiled JS for a handler export and its arity.
-  It only ever matched Gleam's own `export function ...` codegen —
-  esbuild's own bundling (which the SDK explicitly allows: "run your own
-  esbuild, we bundle it again") commonly hoists exports into a trailing
-  `export { x as handle };`, arrow functions, minified/renamed bindings,
-  etc., all of which a regex can't reliably keep up with. The check for a
-  working `handle` export (renamed from `handler`, no
-  fallback) now happens where it can't be fooled by the entry file's
-  shape: at request time, inside the generated worker shim
-  (`internal/shim.gleam`) — `typeof app.handle !== "function"` returns a
-  clear 500 instead of crashing. Don't reintroduce static export-shape
-  parsing in `bundle.run`.
-- **The bundle has almost no configuration surface.** No env-file loading,
-  no aliases. It is always minified, tree-shaken ESM, node platform by
-  default. The one escape hatch is `bundle.additional_args`, a raw
-  `List(String)` of esbuild flags appended after the fixed ones
-  (`internal/esbuild.gleam`'s `flags`) — later flags win, so it's what lets a
-  consumer override a fixed default (`--minify=false`) or mark something
-  `--external` instead of having it bundled again. Don't turn this into
-  named/typed options (a `minify: Bool` field, a `platform` enum, etc.) —
-  it's deliberately one plain pass-through list, not a re-implementation of
-  esbuild's own flag surface.
-- **No env-var handling in the SDK.** There is no `.env` loading, no
-  `PUBLIC_`/`PRIVATE_` inlining. `deploy.token_from_env` is the one place the
-  SDK reads a real environment variable (via `internal/ffi_env.mjs`, a bare
-  `process.env[name]` lookup) — that's authentication, not app config, and is
-  not up for expansion into general env handling.
-- **No glob/ignore matching in `dev`.** `dev.watch` takes directories; there
-  is no `dev.ignore`. Don't reintroduce pattern-based filtering.
-- **Comments are minimal, deliberately.** Almost no doc comments (`///`,
-  `////`) anywhere in `src/`. Keep new code the same way — let names and
-  types carry the meaning. The few comments that do exist are load-bearing
-  (a `TODO` marking real unfinished work, or the one-line note in
-  `internal/project.gleam` explaining why the regex hand-rolls a multi-line
-  anchor). Don't add narrative "why" comments or usage-example doc blocks
-  back in without being asked.
-- **`giolt_sdk/deploy` doesn't talk to the Giolt API yet.** `deploy.run`
-  validates everything it can locally (project id, artifact present, token
-  resolved) and then returns `Error(NotImplemented(...))` at the one seam
-  marked `// TODO` in `deploy.gleam`'s `submit` function. That's intentional,
-  not a bug.
-- **Erlang is stubbed, not supported.** `esbuild_bin`'s `@target(erlang)`
-  branches return a plain "not supported" error (Gleam's own conditional
-  compilation, not a runtime check on the consumer's project). Leave these as
-  stubs unless explicitly asked to implement real Erlang support.
+  Don't reintroduce static export-shape parsing of the compiled JS.
+- **The bundle has almost no configuration surface.** It is always minified,
+  tree-shaken ESM for the node platform. `esbuild_args` is one plain
+  pass-through list appended after the fixed flags (later flags win). Don't turn
+  it into named options.
+- **Hooks are command strings.** `prebuild` runs through the shell before every
+  build, including each `dev` rebuild. There is no closure API.
+- **No env-var handling beyond deploy.** `GIOLT_TOKEN` (authentication) and
+  `GIOLT_API_URL` (overrides `api_url`) are read in `deploy.gleam`. No `.env`
+  loading, no `PUBLIC_`/`PRIVATE_` inlining.
+- **No glob or ignore matching in `dev`.** `watch` takes directories.
+- **Bun is the supported runtime** (`gleam run --runtime bun`); Deno is not
+  supported. The GlowVM output ships only `app.avm`, `glowvm.wasm`, `index.js`
+  and `index.min.js`.
+- **Comments are minimal.** Almost no doc comments in `src/`. Let names and
+  types carry the meaning; the few comments that exist are load-bearing.
+- **The runtime package `glowvm` is declared as a Hex range** in the generated
+  `gleam.toml` (`internal/glowvm.gleam`). Deploying the Erlang target is not
+  supported by the platform yet, so `giolt deploy` refuses it.
 
 ## Vendored code
 
-`src/giolt_sdk/internal/esgleam/` is a trimmed fork of
+`src/giolt/internal/esgleam/` is a trimmed fork of
 [Enderchief/esgleam](https://github.com/Enderchief/esgleam) (Apache-2.0, see
-`NOTICE`/`LICENSE` in that directory) — just enough left for esbuild platform
-detection (`esgleam/mod/platform.gleam`) and tarball extraction
-(`streaming_tar.mjs`). Keep the `// Modified from Enderchief/esgleam...`
-attribution line at the top of files taken from there. The rest of the
-original esgleam (its own CLI/bundler wrapper) was deleted — `bundle.gleam`
-builds and runs the esbuild invocation itself now
-(`internal/esbuild.gleam` + `internal/esbuild_bin.gleam`).
+`NOTICE`/`LICENSE` in that directory): esbuild platform detection
+(`esgleam/mod/platform.gleam`) and tarball extraction (`streaming_tar.mjs`).
+Keep the `// Modified from Enderchief/esgleam...` attribution line at the top
+of files taken from there.
 
 ## FFI conventions
 
 All `.mjs` files live beside the Gleam module that declares their
-`@external`. To import the generated prelude (`Ok`/`Error`) from a file at
-`src/giolt_sdk/internal/X.mjs`, use `"../../gleam.mjs"` — Gleam compiles this
-package's modules to `build/dev/javascript/giolt_sdk/giolt_sdk/...`, so a
-file two segments below `src/` needs two `../` to reach the package-root
-`gleam.mjs`. A file one segment deeper (like `internal/esgleam/X.mjs`) needs
-three. If you add a new nested FFI file, count the depth — this was verified
-against a real `gleam build --target javascript` output, not assumed.
+`@external`, and are referenced as `"./file.mjs"`. To import the generated
+prelude (`Ok`/`Error`) from `src/giolt/internal/X.mjs`, use `"../../gleam.mjs"`:
+Gleam compiles this package's modules to
+`build/dev/javascript/giolt/giolt/...`, so a file two segments below `src/`
+needs two `../`, and one in `internal/esgleam/` needs three.
 
 ## Testing
 
-`gleam test --target javascript`, or `just test`. Tests live in `test/` and
-target the pure `internal/` functions directly — see the table above for
-which module owns which decision. There's no live-fixture/integration test
-today; if you need one, build it against a scratch Gleam project the way the
-history of this file's authoring did (a project with an empty
-`[dependencies]` table needs no hex fetch and is enough to check compiled
-output shape).
+`gleam test --target javascript`, or `just test`. Tests in `test/` target the
+pure functions above directly. Real runs need a scratch Gleam project that
+depends on this repo by path as a dev dependency; the GlowVM build also needs
+a local `glowvm` checkout until it is on Hex.
 
-CI (`.github/workflows/test.yml`) runs `gleam format --check` and
-`gleam test` on every push and PR — including feature branches, not just
-`main`. Keep it that way.
+CI (`.github/workflows/test.yml`) runs `gleam format --check src test` and
+`gleam test` on every push and PR, including feature branches. Keep it that
+way.
