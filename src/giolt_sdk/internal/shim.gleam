@@ -21,6 +21,18 @@ export default {
     const req = conversation.to_gleam_request(request);
     const response = await app.handler(req);
 
+    const body = response?.body;
+    if (
+      !(body instanceof conversation.Text ||
+        body instanceof conversation.Bits ||
+        body instanceof conversation.Stream)
+    ) {
+      return new Response(
+        \"[Giolt SDK] The handler must return a Response(conversation.ResponseBody) built with conversation.Text, Bits or Stream.\",
+        { status: 500 },
+      );
+    }
+
     return conversation.to_js_response(response);
   },
 };
