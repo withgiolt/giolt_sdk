@@ -68,3 +68,14 @@ pub fn target_that_is_not_a_string_is_rejected_test() {
   assert config.parse("name = \"my_app\"\ntarget = 3\n")
     == Error(config.TargetNotAString)
 }
+
+pub fn compiled_entry_points_at_the_javascript_output_test() {
+  let default = Config(package: "my_app", target: Javascript, entry: "my_app")
+  let nested =
+    Config(package: "my_app", target: Javascript, entry: "my_app/server")
+
+  assert config.compiled_entry(default)
+    == "./build/dev/javascript/my_app/my_app.mjs"
+  assert config.compiled_entry(nested)
+    == "./build/dev/javascript/my_app/my_app/server.mjs"
+}

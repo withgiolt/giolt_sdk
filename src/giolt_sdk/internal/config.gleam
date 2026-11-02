@@ -76,3 +76,7 @@ pub fn describe_error(error: Error) -> String {
     EntryNotAString -> "`entry` under [tools.giolt] must be a string."
   }
 }
+
+pub fn compiled_entry(config: Config) -> String {
+  "./build/dev/javascript/" <> config.package <> "/" <> config.entry <> ".mjs"
+}
