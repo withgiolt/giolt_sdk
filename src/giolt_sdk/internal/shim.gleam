@@ -11,20 +11,20 @@ import * as app from \"{entry}\";
 
 export default {
   async fetch(request, _env, _ctx) {
-    if (typeof app.handler !== \"function\") {
+    if (typeof app.handle !== \"function\") {
       return new Response(
-        \"[Giolt SDK] {entry} does not export a `handler` function.\",
+        \"[Giolt SDK] {entry} does not export a `handle` function. The export was renamed from `handler` to `handle`.\",
         { status: 500 },
       );
     }
 
     const req = conversation.to_gleam_request(request);
-    const response = await app.handler(req);
+    const response = await app.handle(req);
 
     const body = response?.body;
     if (typeof body !== \"object\" || body === null) {
       return new Response(
-        \"[Giolt SDK] The handler must return a Response(conversation.ResponseBody), such as one built with conversation.Text.\",
+        \"[Giolt SDK] `handle` must return a Response(conversation.ResponseBody), such as one built with conversation.Text.\",
         { status: 500 },
       );
     }

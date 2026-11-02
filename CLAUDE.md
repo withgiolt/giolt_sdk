@@ -93,15 +93,16 @@ that function.
   user already ran their own esbuild over.
 - **`bundle.run` only checks that the entry file exists, not its contents.**
   There used to be a regex-based static check (`internal/entry.gleam`, since
-  deleted) that scanned the compiled JS for a `handler` export and its arity.
-  It only ever matched Gleam's own `export function handler(...)` codegen —
+  deleted) that scanned the compiled JS for a handler export and its arity.
+  It only ever matched Gleam's own `export function ...` codegen —
   esbuild's own bundling (which the SDK explicitly allows: "run your own
   esbuild, we bundle it again") commonly hoists exports into a trailing
-  `export { x as handler };`, arrow functions, minified/renamed bindings,
+  `export { x as handle };`, arrow functions, minified/renamed bindings,
   etc., all of which a regex can't reliably keep up with. The check for a
-  working `handler` now happens where it can't be fooled by the entry file's
+  working `handle` export (renamed from `handler`, no
+  fallback) now happens where it can't be fooled by the entry file's
   shape: at request time, inside the generated worker shim
-  (`internal/shim.gleam`) — `typeof app.handler !== "function"` returns a
+  (`internal/shim.gleam`) — `typeof app.handle !== "function"` returns a
   clear 500 instead of crashing. Don't reintroduce static export-shape
   parsing in `bundle.run`.
 - **The bundle has almost no configuration surface.** No env-file loading,
