@@ -22,13 +22,9 @@ export default {
     const response = await app.handler(req);
 
     const body = response?.body;
-    if (
-      !(body instanceof conversation.Text ||
-        body instanceof conversation.Bits ||
-        body instanceof conversation.Stream)
-    ) {
+    if (typeof body !== \"object\" || body === null) {
       return new Response(
-        \"[Giolt SDK] The handler must return a Response(conversation.ResponseBody) built with conversation.Text, Bits or Stream.\",
+        \"[Giolt SDK] The handler must return a Response(conversation.ResponseBody), such as one built with conversation.Text.\",
         { status: 500 },
       );
     }

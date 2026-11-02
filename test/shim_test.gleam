@@ -34,12 +34,10 @@ pub fn render_guards_missing_handler_test() {
   assert string.contains(rendered, "typeof app.handler !== \"function\"")
 }
 
-pub fn render_guards_non_conversation_body_test() {
+pub fn render_rejects_non_object_body_test() {
   let rendered = shim.render("/home/user/app/build/dev/javascript/app/app.mjs")
 
-  assert string.contains(rendered, "body instanceof conversation.Text")
-  assert string.contains(rendered, "body instanceof conversation.Bits")
-  assert string.contains(rendered, "body instanceof conversation.Stream")
+  assert string.contains(rendered, "typeof body !== \"object\"")
 }
 
 pub fn render_checks_body_before_converting_test() {
@@ -47,5 +45,5 @@ pub fn render_checks_body_before_converting_test() {
 
   let assert Ok(#(before, _)) =
     string.split_once(rendered, "conversation.to_js_response")
-  assert string.contains(before, "body instanceof conversation.Text")
+  assert string.contains(before, "typeof body !== \"object\"")
 }
