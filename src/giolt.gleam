@@ -2,6 +2,7 @@ import argv
 import giolt_sdk/bundle
 import giolt_sdk/internal/cli
 import giolt_sdk/internal/config.{type Config, Erlang, Javascript}
+import giolt_sdk/internal/glowvm_bin
 import giolt_sdk/internal/io
 import giolt_sdk/internal/process
 import giolt_sdk/internal/signature
@@ -41,6 +42,10 @@ fn run(command: cli.Command) -> Result(Nil, String) {
 
 fn build() -> Result(Nil, String) {
   use config <- result.try(read_config())
+  use _ <- result.try(case config.target {
+    Javascript -> Ok(Nil)
+    Erlang -> glowvm_bin.check_tooling()
+  })
   use _ <- result.try(check_handle(config))
 
   case config.target {
@@ -49,12 +54,8 @@ fn build() -> Result(Nil, String) {
       bundle_javascript(config)
     }
     Erlang -> {
-      io.println_progress(1, 1, "Checked handle")
-      Error(
-        "`handle` in `"
-        <> config.entry
-        <> "` is valid, but building for the Erlang target (GlowVM) is not supported yet.",
-      )
+      io.println_progress(1, glowvm_bin.steps, "Checked handle")
+      glowvm_bin.build(config, bundle.default_outdir)
     }
   }
 }

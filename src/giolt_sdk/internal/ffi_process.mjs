@@ -2,9 +2,9 @@ import { spawnSync } from "node:child_process";
 import { default as process } from "node:process";
 import { Ok, Error as GleamError } from "../../gleam.mjs";
 
-export function run(command, args) {
+export function run(directory, command, args) {
   const result = spawnSync(command, args.toArray(), {
-    cwd: ".",
+    cwd: directory,
     stdio: "inherit",
   });
 
@@ -17,6 +17,11 @@ export function run(command, args) {
   }
 
   return new GleamError(`${command} exited with status ${result.status}`);
+}
+
+export function available(command, args) {
+  const result = spawnSync(command, args.toArray(), { stdio: "ignore" });
+  return !result.error && result.status === 0;
 }
 
 export function exit(code) {
