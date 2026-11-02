@@ -1,32 +1,15 @@
 # giolt_sdk
 
-[![Package Version](https://img.shields.io/hexpm/v/giolt_sdk)](https://hex.pm/packages/giolt_sdk)
+`giolt_sdk` is retired. Use the `giolt` package instead.
 
-The Giolt SDK for building, developing and deploying Gleam apps on the edge.
+`giolt` is a CLI. You run it with `gleam run -m giolt <command>` and configure
+it under `[tools.giolt]` in your `gleam.toml`, so there are no scripts to
+scaffold or keep in sync. It lives in
+[github.com/withgiolt/cli](https://github.com/withgiolt/cli), and the plan is
+in [withgiolt/issues#1](https://github.com/withgiolt/issues/issues/1).
 
-`giolt_sdk` is a library. You write plain Gleam scripts that call into it, and
-you own your own build.
-
-Version 3.0.0 is the last major release. The package is being replaced by
-`giolt`, a CLI run with `gleam run -m giolt` and configured in `gleam.toml`
-(see [withgiolt/issues#1](https://github.com/withgiolt/issues/issues/1)).
-
-## Upgrading to 3.0.0
-
-The worker entry now calls `handle` instead of `handler`. Rename the export in
-your entry module. A module that only exports `handler` gets a 500 that says
-so.
-
-## Install
-
-```sh
-gleam add giolt_sdk
-```
-
-## Documentation
-
-Full docs, including a get-started guide and the complete SDK reference, live
-at [docs.giolt.com/sdk](https://docs.giolt.com/sdk).
+Do not start new projects on `giolt_sdk`. No further `giolt_sdk` releases are
+planned.
 
 ## Issues
 
