@@ -6,4 +6,4 @@ test:
 
 publish-hex:
     gleam build
-    gleam publish --yes
+    printf 'I am not using semantic versioning\n' | gleam publish --yes
