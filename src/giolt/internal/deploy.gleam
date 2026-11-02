@@ -1,6 +1,6 @@
 import envie
-import giolt_sdk/bundle
-import giolt_sdk/internal/io
+import giolt/internal/bundle
+import giolt/internal/io
 import gleam/bit_array
 import gleam/dynamic/decode
 import gleam/fetch
@@ -70,8 +70,8 @@ const default_api_url = "https://dash.giolt.com"
 
 const default_artifact_dir = "./dist"
 
-/// Overrides `deploy.api_url` when set — handy for pointing a deploy at a
-/// local dev server without editing the scaffolded `deploy.gleam`.
+/// Overrides `api_url` from [tools.giolt] when set, to point one deploy at a
+/// local server without editing gleam.toml.
 const api_url_env = "GIOLT_API_URL"
 
 /// Files under this directory (relative to the artifact dir) are uploaded as
@@ -372,14 +372,10 @@ fn deployment_decoder() -> decode.Decoder(Deployment) {
 pub fn describe_error(error: Error) -> String {
   case error {
     MissingToken(var) ->
-      "No deploy token found. Set the `"
-      <> var
-      <> "` environment variable, or pass one with `deploy.token`."
+      "No deploy token found. Set the `" <> var <> "` environment variable."
 
     ArtifactNotFound(path) ->
-      "No such artifact directory: "
-      <> path
-      <> ". Run your build first, or pass its `bundle.Output` to `deploy.from`."
+      "No such artifact directory: " <> path <> ". Run `giolt build` first."
 
     ArtifactEmpty(path) -> "The artifact directory " <> path <> " is empty."
 

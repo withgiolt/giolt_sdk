@@ -1,4 +1,4 @@
-import giolt_sdk/internal/shim
+import giolt/internal/shim
 import gleam/string
 
 pub fn render_substitutes_entry_test() {

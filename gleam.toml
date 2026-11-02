@@ -1,7 +1,7 @@
-name = "giolt_sdk"
-version = "3.0.1"
-description = "The Giolt SDK for deploying Gleam apps to the edge"
-internal_modules = ["giolt_sdk/internal", "giolt_sdk/internal/*"]
+name = "giolt"
+version = "0.1.0"
+description = "Build, run and deploy Gleam apps on Giolt"
+internal_modules = ["giolt/internal", "giolt/internal/*"]
 target = "javascript"
 licences = ["GPL-3.0-or-later", "Apache-2.0"]
 repository = { type = "github", user = "withgiolt", repo = "cli" }
@@ -21,6 +21,11 @@ gleam_fetch = ">= 1.4.1 and < 2.0.0"
 gleam_json = ">= 3.1.0 and < 4.0.0"
 gleam_http = ">= 4.4.0 and < 5.0.0"
 envie = ">= 1.2.0 and < 2.0.0"
+clip = ">= 1.2.2 and < 2.0.0"
+argv = ">= 1.1.0 and < 2.0.0"
+tom = ">= 2.1.0 and < 3.0.0"
+gleam_package_interface = ">= 4.0.0 and < 5.0.0"
+glitzer = ">= 2.0.0 and < 3.0.0"
 
 [dev_dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

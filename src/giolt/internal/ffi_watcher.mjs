@@ -44,7 +44,7 @@ export function watch(paths, on_change) {
       watchers.push(watcher);
     } catch (error) {
       console.error(
-        `[Giolt SDK] Could not watch ${directory}: ${error?.message ?? error}`,
+        `[Giolt] Could not watch ${directory}: ${error?.message ?? error}`,
       );
     }
   }
