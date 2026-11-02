@@ -16,7 +16,7 @@ const bold_yellow = "\u{001b}[1;33m"
 const bold = "\u{001b}[1m"
 
 fn tag() -> String {
-  bold_white_on_grey <> "[Giolt SDK]" <> reset
+  bold_white_on_grey <> "[Giolt]" <> reset
 }
 
 fn line(colour: String, message: String) -> String {

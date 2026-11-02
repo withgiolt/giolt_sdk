@@ -1,4 +1,4 @@
-import giolt_sdk/internal/config.{type Target, Erlang, Javascript}
+import giolt/internal/config.{type Target, Erlang, Javascript}
 import gleam/dict
 import gleam/json
 import gleam/list

@@ -129,7 +129,7 @@ async function serveWorker(workerPath, req, res) {
   if (!worker || typeof worker.fetch !== "function") {
     res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
     res.end(
-      `[Giolt SDK] ${workerPath} has no default export with a fetch function.`,
+      `[Giolt] ${workerPath} has no default export with a fetch function.`,
     );
     return;
   }
@@ -189,11 +189,11 @@ export function serve(port, staticDir, workerPath, liveReload) {
       await serveWorker(workerPath, req, res);
     } catch (error) {
       res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
-      res.end(`[Giolt SDK] ${error?.stack ?? error}`);
+      res.end(`[Giolt] ${error?.stack ?? error}`);
     }
   });
 
   server.listen(port, () => {
-    console.log(`[Giolt SDK] Dev server listening on http://localhost:${port}`);
+    console.log(`[Giolt] Dev server listening on http://localhost:${port}`);
   });
 }

@@ -1,4 +1,4 @@
-import giolt_sdk/bundle
+import giolt/internal/bundle
 import gleam/option
 import gleam/string
 

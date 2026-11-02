@@ -1,4 +1,4 @@
-import giolt_sdk/internal/esbuild
+import giolt/internal/esbuild
 import gleam/list
 
 pub fn flags_contains_entry_test() {

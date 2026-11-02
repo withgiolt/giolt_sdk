@@ -1,6 +1,6 @@
-import giolt_sdk/internal/esbuild
-import giolt_sdk/internal/esgleam/esgleam/mod/platform
-import giolt_sdk/internal/io
+import giolt/internal/esbuild
+import giolt/internal/esgleam/esgleam/mod/platform
+import giolt/internal/io
 import simplifile
 
 pub fn ensure_installed() -> Result(String, String) {

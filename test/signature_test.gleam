@@ -1,5 +1,5 @@
-import giolt_sdk/internal/config.{Erlang, Javascript}
-import giolt_sdk/internal/signature
+import giolt/internal/config.{Erlang, Javascript}
+import giolt/internal/signature
 import interface_fixture.{Fn}
 
 fn handle(parameters, return) {

@@ -1,4 +1,4 @@
-import giolt_sdk/internal/tooling.{Erlang, Rebar3}
+import giolt/internal/tooling.{Erlang, Rebar3}
 import gleam/string
 
 pub fn missing_tools_are_named_with_a_hint_test() {

@@ -1,7 +1,7 @@
-name = "giolt_sdk"
-version = "3.0.1"
-description = "The Giolt SDK for deploying Gleam apps to the edge"
-internal_modules = ["giolt_sdk/internal", "giolt_sdk/internal/*"]
+name = "giolt"
+version = "0.1.0"
+description = "Build, run and deploy Gleam apps on Giolt"
+internal_modules = ["giolt/internal", "giolt/internal/*"]
 target = "javascript"
 licences = ["GPL-3.0-or-later", "Apache-2.0"]
 repository = { type = "github", user = "withgiolt", repo = "cli" }

@@ -1,4 +1,4 @@
-import giolt_sdk/internal/io
+import giolt/internal/io
 import gleam/list
 import gleam/string
 

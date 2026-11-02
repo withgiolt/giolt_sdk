@@ -1,9 +1,9 @@
 import filepath
-import giolt_sdk/internal/config.{type Config}
-import giolt_sdk/internal/glowvm
-import giolt_sdk/internal/io
-import giolt_sdk/internal/process
-import giolt_sdk/internal/tooling
+import giolt/internal/config.{type Config}
+import giolt/internal/glowvm
+import giolt/internal/io
+import giolt/internal/process
+import giolt/internal/tooling
 import gleam/list
 import gleam/result
 import gleam/string

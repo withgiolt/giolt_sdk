@@ -1,13 +1,13 @@
 import filepath
-import giolt_sdk/bundle
-import giolt_sdk/deploy
-import giolt_sdk/internal/config.{type Config, Erlang, Javascript}
-import giolt_sdk/internal/glowvm_bin
-import giolt_sdk/internal/io
-import giolt_sdk/internal/process
-import giolt_sdk/internal/server
-import giolt_sdk/internal/signature
-import giolt_sdk/internal/watcher
+import giolt/internal/bundle
+import giolt/internal/config.{type Config, Erlang, Javascript}
+import giolt/internal/deploy
+import giolt/internal/glowvm_bin
+import giolt/internal/io
+import giolt/internal/process
+import giolt/internal/server
+import giolt/internal/signature
+import giolt/internal/watcher
 import gleam/javascript/promise.{type Promise}
 import gleam/option.{type Option, None, Some}
 import gleam/result

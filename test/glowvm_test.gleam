@@ -1,4 +1,4 @@
-import giolt_sdk/internal/glowvm
+import giolt/internal/glowvm
 import gleam/string
 
 pub fn start_calls_handle_through_a_lambda_test() {

@@ -1,6 +1,6 @@
 import envie
-import giolt_sdk/bundle
-import giolt_sdk/deploy
+import giolt/internal/bundle
+import giolt/internal/deploy
 import gleam/bit_array
 import gleam/option
 import gleam/string

@@ -1,4 +1,4 @@
-import giolt_sdk/internal/cli.{Build, Deploy, Dev, Invalid, Run, Usage}
+import giolt/internal/cli.{Build, Deploy, Dev, Invalid, Run, Usage}
 import gleam/option.{None, Some}
 import gleam/string
 

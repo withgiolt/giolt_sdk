@@ -1,8 +1,8 @@
 import filepath
-import giolt_sdk/internal/esbuild
-import giolt_sdk/internal/esbuild_bin
-import giolt_sdk/internal/io
-import giolt_sdk/internal/shim
+import giolt/internal/esbuild
+import giolt/internal/esbuild_bin
+import giolt/internal/io
+import giolt/internal/shim
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -165,7 +165,7 @@ fn write_shim(entry_path: String) -> Result(Nil, Error) {
   |> result.map_error(CannotWriteShim)
 }
 
-@external(javascript, "./internal/ffi_paths.mjs", "resolve_absolute")
+@external(javascript, "./ffi_paths.mjs", "resolve_absolute")
 fn resolve_absolute(path: String) -> String
 
 fn run_esbuild(
@@ -211,10 +211,9 @@ pub fn describe_error(error: Error) -> String {
       "Could not find the entry file at "
       <> path
       <> ".\n"
-      <> "  Check the path passed to `bundle.entry`. If it points at "
-      <> "compiled Gleam output, make sure the project has been built for "
-      <> "the javascript target first (`gleam build --target javascript`, "
-      <> "or `dev.compile()`)."
+      <> "  Check `entry` under [tools.giolt] and make sure the project has "
+      <> "been built for the javascript target (`gleam build --target "
+      <> "javascript`)."
 
     CannotClearOutdir(reason) ->
       "Could not clear the output directory: " <> string.inspect(reason)
@@ -236,13 +235,12 @@ pub fn describe_error(error: Error) -> String {
       <> "Pick something more specific, like `./dist`."
 
     EntryInsideOutdir(entry, outdir) ->
-      "`bundle.entry(\""
+      "The entry file `"
       <> entry
-      <> "\")` points inside `bundle.outdir(\""
+      <> "` is inside `outdir` (`"
       <> outdir
-      <> "\")`, which gets deleted before every bundle.\n"
-      <> "  Point entry at your compiled Gleam module (e.g. under "
-      <> "./build/dev/javascript/...), not at the bundle's own output."
+      <> "`), which gets deleted before every bundle.\n"
+      <> "  Pick an `outdir` outside the compiled Gleam output."
   }
 }
 

@@ -1,4 +1,4 @@
-import giolt_sdk/internal/config.{Erlang, Javascript}
+import giolt/internal/config.{Erlang, Javascript}
 import gleam/option.{None, Some}
 
 pub fn entry_defaults_to_the_package_module_test() {

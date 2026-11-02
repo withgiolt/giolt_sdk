@@ -1,8 +1,8 @@
 import argv
-import giolt_sdk/internal/cli
-import giolt_sdk/internal/commands
-import giolt_sdk/internal/io
-import giolt_sdk/internal/process
+import giolt/internal/cli
+import giolt/internal/commands
+import giolt/internal/io
+import giolt/internal/process
 import gleam/io as stdio
 import gleam/javascript/promise.{type Promise}
 
