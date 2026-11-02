@@ -9,6 +9,8 @@ import gleam/io as stdio
 import gleam/result
 import simplifile
 
+const javascript_steps = 3
+
 const interface_path = "./build/.giolt-interface.json"
 
 pub fn main() -> Nil {
@@ -42,13 +44,18 @@ fn build() -> Result(Nil, String) {
   use _ <- result.try(check_handle(config))
 
   case config.target {
-    Javascript -> bundle_javascript(config)
-    Erlang ->
+    Javascript -> {
+      io.println_progress(1, javascript_steps, "Checked handle")
+      bundle_javascript(config)
+    }
+    Erlang -> {
+      io.println_progress(1, 1, "Checked handle")
       Error(
         "`handle` in `"
         <> config.entry
         <> "` is valid, but building for the Erlang target (GlowVM) is not supported yet.",
       )
+    }
   }
 }
 
@@ -94,5 +101,5 @@ fn bundle_javascript(config: Config) -> Result(Nil, String) {
   |> bundle.entry(config.compiled_entry(config))
   |> bundle.run
   |> result.replace_error("Build failed.")
-  |> result.replace(Nil)
+  |> result.map(fn(_) { io.println_progress(3, javascript_steps, "Bundled") })
 }
