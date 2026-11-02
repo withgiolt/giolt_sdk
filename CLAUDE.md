@@ -137,11 +137,9 @@ that function.
   back — the supervisor compiling before every child is what makes the
   closure correct.
 
-- **Nothing in `dev` may read `process.env`.** Under Deno (a supported way to
-  run this — `gleam run --runtime deno`) `process.env` requires `--allow-env`,
-  while `process.argv` needs no permission at all. That is why the child
-  marker is an argv flag and the change handoff is a file. Verified against a
-  real `deno run`, not assumed.
+- **`dev` passes the child marker as an argv flag and the change handoff as a
+  file, not through `process.env`.** Bun is the supported runtime
+  (`gleam run --runtime bun`); Deno is not supported.
 - **`bundle.entry` is a path, not a module name.** It used to take a Gleam
   module name and resolve it under `./build/dev/javascript/...` itself; it no
   longer does that resolution. The scaffolded templates bake the default
