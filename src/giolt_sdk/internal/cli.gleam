@@ -1,12 +1,15 @@
 import clip
+import clip/flag
 import clip/help
+import clip/opt
 import gleam/list
+import gleam/option.{type Option}
 import gleam/string
 
 pub type Command {
   Build
   Dev
-  Deploy
+  Deploy(preview: Bool, message: Option(String))
 }
 
 pub type Outcome {
@@ -14,6 +17,8 @@ pub type Outcome {
   Usage(String)
   Invalid(String)
 }
+
+const command_names = ["build", "dev", "deploy"]
 
 pub fn parse(args: List(String)) -> Outcome {
   case clip.parse(command(), args) {
@@ -31,7 +36,7 @@ pub fn parse(args: List(String)) -> Outcome {
         _ ->
           case wants_usage(args) {
             True -> Usage(text)
-            False -> Invalid(invalid_message(args))
+            False -> Invalid(invalid_message(args, text))
           }
       }
   }
@@ -41,9 +46,24 @@ fn command() -> clip.Command(Command) {
   clip.subcommands([
     #("build", subcommand(Build, "build", "Bundle the app for deployment")),
     #("dev", subcommand(Dev, "dev", "Run the app locally with live reload")),
-    #("deploy", subcommand(Deploy, "deploy", "Deploy the bundle to Giolt")),
+    #("deploy", deploy_command()),
   ])
   |> clip.help(help.simple("giolt", "Build, run and deploy Gleam apps on Giolt"))
+}
+
+fn deploy_command() -> clip.Command(Command) {
+  clip.command(fn(preview) {
+    fn(message) { Deploy(preview:, message: option.from_result(message)) }
+  })
+  |> clip.flag(
+    flag.new("preview") |> flag.help("Deploy as a preview, not to production"),
+  )
+  |> clip.opt(
+    opt.new("message")
+    |> opt.help("A note to attach to the deployment")
+    |> opt.optional,
+  )
+  |> clip.help(help.simple("giolt deploy", "Deploy the bundle to Giolt"))
 }
 
 fn subcommand(
@@ -66,9 +86,13 @@ fn usage_text() -> String {
   }
 }
 
-fn invalid_message(args: List(String)) -> String {
+fn invalid_message(args: List(String), clip_text: String) -> String {
   case args {
-    [unknown, ..] -> "Unknown command `" <> unknown <> "`.\n\n" <> usage_text()
+    [first, ..] ->
+      case list.contains(command_names, first) {
+        True -> clip_text
+        False -> "Unknown command `" <> first <> "`.\n\n" <> usage_text()
+      }
     [] -> usage_text()
   }
 }

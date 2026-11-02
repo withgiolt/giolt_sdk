@@ -1,3 +1,5 @@
+import gleam/javascript/promise.{type Promise}
+
 pub fn run(command: String, args: List(String)) -> Result(Nil, String) {
   run_in(".", command, args)
 }
@@ -17,6 +19,24 @@ pub fn run_in(
   _args: List(String),
 ) -> Result(Nil, String) {
   Error("Giolt only supports the `javascript` target.")
+}
+
+@target(javascript)
+@external(javascript, "./ffi_process.mjs", "shell")
+pub fn shell(command: String) -> Result(Nil, String)
+
+@target(erlang)
+pub fn shell(_command: String) -> Result(Nil, String) {
+  Error("Giolt only supports the `javascript` target.")
+}
+
+@target(javascript)
+@external(javascript, "./ffi_process.mjs", "forever")
+pub fn forever() -> Promise(Nil)
+
+@target(erlang)
+pub fn forever() -> Promise(Nil) {
+  promise.resolve(Nil)
 }
 
 @target(javascript)

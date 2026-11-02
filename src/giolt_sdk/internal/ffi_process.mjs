@@ -19,6 +19,24 @@ export function run(directory, command, args) {
   return new GleamError(`${command} exited with status ${result.status}`);
 }
 
+export function shell(command) {
+  const result = spawnSync(command, { cwd: ".", stdio: "inherit", shell: true });
+
+  if (result.error) {
+    return new GleamError(result.error.message);
+  }
+
+  if (result.status === 0) {
+    return new Ok(undefined);
+  }
+
+  return new GleamError(`\`${command}\` exited with status ${result.status}`);
+}
+
+export function forever() {
+  return new Promise(() => {});
+}
+
 export function available(command, args) {
   const result = spawnSync(command, args.toArray(), { stdio: "ignore" });
   return !result.error && result.status === 0;

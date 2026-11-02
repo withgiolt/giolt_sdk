@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { copyFile, readFile, rm, stat } from "node:fs/promises";
+import { dirname, extname, join, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const MIME_TYPES = {
@@ -95,17 +95,33 @@ async function readRequestBody(req) {
   return chunks.length > 0 ? Buffer.concat(chunks) : undefined;
 }
 
-async function serveWorker(workerPath, req, res) {
-  const moduleUrl = `${pathToFileURL(workerPath).href}?v=${reloadVersion}`;
+let loadedWorker = { version: -1, worker: null };
 
+// Bun ignores the query string when caching ES modules, so each version is
+// imported from its own temporary copy next to the bundle.
+async function loadWorker(workerPath) {
+  if (loadedWorker.version === reloadVersion) return loadedWorker.worker;
+
+  const copy = join(dirname(workerPath), `.giolt-dev-${reloadVersion}.mjs`);
+  await copyFile(workerPath, copy);
+  try {
+    const worker = (await import(pathToFileURL(copy).href)).default;
+    loadedWorker = { version: reloadVersion, worker };
+    return worker;
+  } finally {
+    await rm(copy, { force: true });
+  }
+}
+
+async function serveWorker(workerPath, req, res) {
   let worker;
   try {
-    worker = (await import(moduleUrl)).default;
+    worker = await loadWorker(workerPath);
   } catch (error) {
     res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
     res.end(
-      `[Giolt SDK] Could not load ${workerPath}.\n` +
-        `Run your build first (gleam run -m build).\n\n${error?.stack ?? error}`,
+      `[Giolt] Could not load ${workerPath}.\n` +
+        `Run your build first (gleam run -m giolt build).\n\n${error?.stack ?? error}`,
     );
     return;
   }
