@@ -9,7 +9,7 @@ import gleam/string
 pub type Command {
   Build
   Dev
-  Deploy(preview: Bool, message: Option(String))
+  Deploy(preview: Bool, message: Option(String), artifact: Option(String))
 }
 
 pub type Outcome {
@@ -53,7 +53,15 @@ fn command() -> clip.Command(Command) {
 
 fn deploy_command() -> clip.Command(Command) {
   clip.command(fn(preview) {
-    fn(message) { Deploy(preview:, message: option.from_result(message)) }
+    fn(message) {
+      fn(artifact) {
+        Deploy(
+          preview:,
+          message: option.from_result(message),
+          artifact: option.from_result(artifact),
+        )
+      }
+    }
   })
   |> clip.flag(
     flag.new("preview") |> flag.help("Deploy as a preview, not to production"),
@@ -61,6 +69,11 @@ fn deploy_command() -> clip.Command(Command) {
   |> clip.opt(
     opt.new("message")
     |> opt.help("A note to attach to the deployment")
+    |> opt.optional,
+  )
+  |> clip.opt(
+    opt.new("artifact")
+    |> opt.help("Deploy this directory as a static site, skipping the build")
     |> opt.optional,
   )
   |> clip.help(help.simple("giolt deploy", "Deploy the bundle to Giolt"))

@@ -98,6 +98,7 @@ port = 8080
 live_reload = false
 api_url = \"http://localhost:4000\"
 prebuild = \"gleam run -m docs/build\"
+artifact = \"./site\"
 "
 
 pub fn every_key_is_read_from_tools_giolt_test() {
@@ -115,6 +116,7 @@ pub fn every_key_is_read_from_tools_giolt_test() {
       live_reload: False,
       api_url: "http://localhost:4000",
       prebuild: Some("gleam run -m docs/build"),
+      artifact: Some("./site"),
     ))
 }
 
@@ -130,6 +132,7 @@ pub fn defaults_apply_when_no_keys_are_set_test() {
   assert parsed.live_reload == True
   assert parsed.api_url == "https://dash.giolt.com"
   assert parsed.prebuild == None
+  assert parsed.artifact == None
 }
 
 pub fn assets_directory_is_watched_by_default_test() {
@@ -176,6 +179,8 @@ pub fn wrongly_typed_keys_are_rejected_test() {
     == Error(config.InvalidValue(key: "port", expected: "a whole number"))
   assert parse("prebuild = 3")
     == Error(config.InvalidValue(key: "prebuild", expected: "a string"))
+  assert parse("artifact = 1")
+    == Error(config.InvalidValue(key: "artifact", expected: "a string"))
   assert parse("api_url = []")
     == Error(config.InvalidValue(key: "api_url", expected: "a string"))
 }

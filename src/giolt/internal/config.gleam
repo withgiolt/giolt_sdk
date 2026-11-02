@@ -24,6 +24,7 @@ pub type Config {
     live_reload: Bool,
     api_url: String,
     prebuild: Option(String),
+    artifact: Option(String),
   )
 }
 
@@ -52,6 +53,7 @@ pub fn default(package: String, target: Target) -> Config {
     live_reload: True,
     api_url: "https://dash.giolt.com",
     prebuild: None,
+    artifact: None,
   )
 }
 
@@ -107,6 +109,12 @@ pub fn parse(source: String) -> Result(Config, Error) {
     tom.as_string,
     "a string",
   ))
+  use artifact <- result.try(optional(
+    toml,
+    "artifact",
+    tom.as_string,
+    "a string",
+  ))
   use watch <- result.try(with_default(
     toml,
     "watch",
@@ -128,6 +136,7 @@ pub fn parse(source: String) -> Result(Config, Error) {
     live_reload:,
     api_url:,
     prebuild:,
+    artifact:,
   ))
 }
 

@@ -124,6 +124,10 @@ only reads, writes and calls it.
   tree-shaken ESM for the node platform. `esbuild_args` is one plain
   pass-through list appended after the fixed flags (later flags win). Don't turn
   it into named options.
+- **`artifact` makes a static-only site.** With the key (or `deploy --artifact`)
+  set, `build` runs only `prebuild` and checks the directory, `deploy` uploads
+  every file in it as an asset with no worker module, and `dev` serves it with no
+  worker. There is no `handle` check or bundling, and it works for either target.
 - **Hooks are command strings.** `prebuild` runs through the shell before every
   build, including each `dev` rebuild. There is no closure API.
 - **No env-var handling beyond deploy.** `GIOLT_TOKEN` (authentication) and

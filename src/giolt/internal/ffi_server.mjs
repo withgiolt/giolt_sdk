@@ -114,6 +114,12 @@ async function loadWorker(workerPath) {
 }
 
 async function serveWorker(workerPath, req, res) {
+  if (!workerPath) {
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+    res.end("Not found");
+    return;
+  }
+
   let worker;
   try {
     worker = await loadWorker(workerPath);

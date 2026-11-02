@@ -28,7 +28,7 @@ and fails with the expected and found types when it does not match.
 | --- | --- |
 | `giolt build` | Checks `handle`, compiles and bundles into `outdir` |
 | `giolt dev` | Builds, watches `watch`, serves on `port` and reloads on change (JavaScript target) |
-| `giolt deploy [--preview] [--message TEXT]` | Builds, then uploads `outdir` to Giolt (JavaScript target) |
+| `giolt deploy [--preview] [--message TEXT] [--artifact DIR]` | Builds, then uploads `outdir` to Giolt (JavaScript target). With `artifact`, uploads that directory instead |
 
 `deploy` reads the token from `GIOLT_TOKEN`. `GIOLT_API_URL` overrides `api_url`.
 
@@ -48,6 +48,7 @@ Everything is optional and lives under `[tools.giolt]` in your `gleam.toml`:
 | `live_reload` | `true` | Reload the browser after a rebuild |
 | `api_url` | `"https://dash.giolt.com"` | Giolt API used by `deploy` |
 | `prebuild` | none | Shell command run before every build, such as `gleam run -m docs/build` |
+| `artifact` | none | Deploy this directory as a static site. Skips the `handle` check, the compile and the bundle |
 
 ## Erlang target
 
