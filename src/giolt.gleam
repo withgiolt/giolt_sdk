@@ -31,6 +31,7 @@ fn run(command: cli.Command) -> Promise(Result(Nil, String)) {
   case command {
     cli.Build -> promise.resolve(commands.build())
     cli.Dev -> commands.dev()
-    cli.Deploy(preview:, message:) -> commands.deploy(preview:, message:)
+    cli.Deploy(preview:, message:, artifact:) ->
+      commands.deploy(preview:, message:, artifact:)
   }
 }

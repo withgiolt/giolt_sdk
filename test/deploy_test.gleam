@@ -2,6 +2,7 @@ import envie
 import giolt/internal/bundle
 import giolt/internal/deploy
 import gleam/bit_array
+import gleam/list
 import gleam/option
 import gleam/string
 import simplifile
@@ -28,6 +29,7 @@ pub fn plan_resolves_token_from_env_test() {
   assert deploy.plan(config)
     == Ok(deploy.Plan(
       artifact_dir: "./dist",
+      assets_only: False,
       preview: False,
       spa: False,
       token: "secret",
@@ -47,6 +49,7 @@ pub fn plan_uses_explicit_token_test() {
   assert deploy.plan(config)
     == Ok(deploy.Plan(
       artifact_dir: "./dist",
+      assets_only: False,
       preview: False,
       spa: False,
       token: "explicit-token",
@@ -190,4 +193,44 @@ pub fn plan_carries_spa_flag_test() {
 
   let assert Ok(plan) = deploy.plan(config)
   assert plan.spa
+}
+
+pub fn plan_for_an_assets_only_site_test() {
+  envie.unset("GIOLT_API_URL")
+
+  let config =
+    deploy.new()
+    |> deploy.assets("./site")
+    |> deploy.token("explicit-token")
+
+  let assert Ok(plan) = deploy.plan(config)
+
+  assert plan.artifact_dir == "./site"
+  assert plan.assets_only
+}
+
+pub fn assets_only_files_uploads_every_file_as_an_asset_test() {
+  let dir = "./test_tmp_assets_only"
+  let _ = simplifile.delete(dir)
+  let assert Ok(_) = simplifile.create_directory_all(dir <> "/blog")
+  let assert Ok(_) = simplifile.write(dir <> "/index.html", "<h1>hi</h1>")
+  let assert Ok(_) = simplifile.write(dir <> "/index.mjs", "not a module")
+  let assert Ok(_) = simplifile.write(dir <> "/blog/post.html", "<p>x</p>")
+
+  let result = deploy.assets_only_files(dir)
+
+  let assert Ok(_) = simplifile.delete(dir)
+  let assert Ok(assets) = result
+
+  assert list.sort(assets, fn(a, b) { string.compare(a.0, b.0) })
+    == [
+      #("blog/post.html", bit_array.base64_encode(<<"<p>x</p>":utf8>>, True)),
+      #("index.html", bit_array.base64_encode(<<"<h1>hi</h1>":utf8>>, True)),
+      #("index.mjs", bit_array.base64_encode(<<"not a module":utf8>>, True)),
+    ]
+}
+
+pub fn assets_only_files_reports_an_unreadable_directory_test() {
+  assert deploy.assets_only_files("./no_such_site_dir")
+    == Error(deploy.CannotReadArtifact("./no_such_site_dir"))
 }

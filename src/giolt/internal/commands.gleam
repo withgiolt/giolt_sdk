@@ -19,25 +19,47 @@ const interface_path = "./build/.giolt-interface.json"
 
 pub fn build() -> Result(Nil, String) {
   use config <- result.try(read_config())
-  run_build(config)
+
+  case config.artifact {
+    Some(path) -> prepare_site(config, path)
+    None -> run_build(config)
+  }
 }
 
 pub fn deploy(
   preview preview: Bool,
   message message: Option(String),
+  artifact artifact: Option(String),
 ) -> Promise(Result(Nil, String)) {
   case read_config() {
     Error(message) -> promise.resolve(Error(message))
     Ok(config) ->
-      case config.target {
-        Erlang ->
+      case option.or(artifact, config.artifact), config.target {
+        Some(path), _ ->
+          case prepare_site(config, path) {
+            Error(message) -> promise.resolve(Error(message))
+            Ok(Nil) ->
+              submit(
+                config,
+                deploy.new() |> deploy.assets(path),
+                preview,
+                message,
+              )
+          }
+        None, Erlang ->
           promise.resolve(Error(
             "Deploying the Erlang target is not supported by the Giolt platform yet.",
           ))
-        Javascript ->
+        None, Javascript ->
           case run_build(config) {
             Error(message) -> promise.resolve(Error(message))
-            Ok(Nil) -> submit(config, preview, message)
+            Ok(Nil) ->
+              submit(
+                config,
+                deploy.new() |> deploy.artifact(config.outdir),
+                preview,
+                message,
+              )
           }
       }
   }
@@ -47,38 +69,76 @@ pub fn dev() -> Promise(Result(Nil, String)) {
   case read_config() {
     Error(message) -> promise.resolve(Error(message))
     Ok(config) ->
-      case config.target {
-        Erlang ->
+      case config.artifact, config.target {
+        Some(path), _ -> serve_dev(config, path, "")
+        None, Erlang ->
           promise.resolve(Error(
             "`giolt dev` supports the javascript target only for now.",
           ))
-        Javascript -> {
-          rebuild(config)
-
-          let stop_watching =
-            watcher.watch(config.watch, fn(path, _kind) {
-              io.println_info("Changed " <> path <> ", rebuilding")
-              rebuild(config)
-            })
-
-          server.serve(
-            port: config.port,
-            static_dir: config.assets,
-            worker_path: filepath.join(config.outdir, "index.mjs"),
-            live_reload: config.live_reload,
+        None, Javascript ->
+          serve_dev(
+            config,
+            option.unwrap(config.assets, ""),
+            filepath.join(config.outdir, "index.mjs"),
           )
-
-          let _ = stop_watching
-          process.forever() |> promise.map(fn(_) { Ok(Nil) })
-        }
       }
   }
 }
 
+fn serve_dev(
+  config: Config,
+  static_dir: String,
+  worker_path: String,
+) -> Promise(Result(Nil, String)) {
+  rebuild(config)
+
+  let stop_watching =
+    watcher.watch(config.watch, fn(path, _kind) {
+      io.println_info("Changed " <> path <> ", rebuilding")
+      rebuild(config)
+    })
+
+  server.serve(
+    port: config.port,
+    static_dir: case static_dir {
+      "" -> None
+      path -> Some(path)
+    },
+    worker_path:,
+    live_reload: config.live_reload,
+  )
+
+  let _ = stop_watching
+  process.forever() |> promise.map(fn(_) { Ok(Nil) })
+}
+
 fn rebuild(config: Config) -> Nil {
-  case run_build(config) {
+  let result = case config.artifact {
+    Some(path) -> prepare_site(config, path)
+    None -> run_build(config)
+  }
+
+  case result {
     Ok(Nil) -> server.notify_reload()
     Error(message) -> io.println_error(message)
+  }
+}
+
+fn prepare_site(config: Config, path: String) -> Result(Nil, String) {
+  use _ <- result.try(run_prebuild(config.prebuild))
+
+  case simplifile.read_directory(path) {
+    Ok([_, ..]) -> {
+      io.println_success("Static site ready in " <> path)
+      Ok(Nil)
+    }
+    Ok([]) -> Error("The artifact directory " <> path <> " is empty.")
+    Error(_) ->
+      Error(
+        "No such artifact directory: "
+        <> path
+        <> ". Make `prebuild` write the site there.",
+      )
   }
 }
 
@@ -180,12 +240,12 @@ fn warn_unused_assets(config: Config) -> Nil {
 
 fn submit(
   config: Config,
+  artifact: deploy.Config(deploy.HasArtifact),
   preview: Bool,
   message: Option(String),
 ) -> Promise(Result(Nil, String)) {
   let base =
-    deploy.new()
-    |> deploy.artifact(config.outdir)
+    artifact
     |> deploy.preview(preview)
     |> deploy.spa(config.spa)
     |> deploy.api_url(config.api_url)

@@ -22,6 +22,7 @@ pub type HasArtifact
 type Artifact {
   Directory(path: String)
   FromBundle(output: bundle.Output)
+  AssetsOnly(path: String)
 }
 
 type TokenSource {
@@ -56,6 +57,7 @@ pub type Error {
 pub type Plan {
   Plan(
     artifact_dir: String,
+    assets_only: Bool,
     preview: Bool,
     spa: Bool,
     token: String,
@@ -94,6 +96,13 @@ pub fn artifact(
   path: String,
 ) -> Config(HasArtifact) {
   set_artifact(config, Directory(path))
+}
+
+pub fn assets(
+  config: Config(has_artifact),
+  path: String,
+) -> Config(HasArtifact) {
+  set_artifact(config, AssetsOnly(path))
 }
 
 pub fn from(
@@ -181,6 +190,7 @@ pub fn plan(config: Config(HasArtifact)) -> Result(Plan, Error) {
 
   Ok(Plan(
     artifact_dir: artifact_dir(config.artifact),
+    assets_only: is_assets_only(config.artifact),
     preview: config.preview,
     spa: config.spa,
     token: token,
@@ -193,7 +203,15 @@ fn artifact_dir(artifact: Option(Artifact)) -> String {
   case artifact {
     Some(Directory(path)) -> path
     Some(FromBundle(output)) -> output.outdir
+    Some(AssetsOnly(path)) -> path
     None -> default_artifact_dir
+  }
+}
+
+fn is_assets_only(artifact: Option(Artifact)) -> Bool {
+  case artifact {
+    Some(AssetsOnly(_)) -> True
+    _ -> False
   }
 }
 
@@ -236,7 +254,14 @@ fn submit(plan: Plan) -> Promise(Result(Deployment, Error)) {
     <> "...",
   )
 
-  case artifact_files(plan.artifact_dir) {
+  let files = case plan.assets_only {
+    True ->
+      assets_only_files(plan.artifact_dir)
+      |> result.map(fn(assets) { #([], assets) })
+    False -> artifact_files(plan.artifact_dir)
+  }
+
+  case files {
     Error(error) -> promise.resolve(Error(error))
     Ok(#(modules, assets)) -> post_deploy(plan, modules, assets)
   }
@@ -263,6 +288,16 @@ pub fn artifact_files(
   use assets <- result.try(read_and_encode(asset_paths, static_prefix))
 
   Ok(#(modules, assets))
+}
+
+pub fn assets_only_files(
+  dir: String,
+) -> Result(List(#(String, String)), Error) {
+  use paths <- result.try(
+    simplifile.get_files(dir) |> result.replace_error(CannotReadArtifact(dir)),
+  )
+
+  read_and_encode(paths, strip_trailing_slash(dir) <> "/")
 }
 
 fn read_and_encode(
