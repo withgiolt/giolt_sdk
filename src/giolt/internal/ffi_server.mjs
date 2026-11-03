@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { copyFile, readFile, rm, stat } from "node:fs/promises";
 import { dirname, extname, join, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
+import { decode } from "./static_path.mjs";
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -60,11 +61,17 @@ async function statFile(path) {
   }
 }
 
-async function serveStatic(staticDir, method, urlPath, res, spaFallback) {
-  const cleanPath = normalize(urlPath.split("?")[0]).replace(
-    /^(\.\.[/\\])+/,
-    "",
-  );
+async function serveStatic(staticDir, method, urlPath, res, spaFallback, hasWorker) {
+  const decoded = decode(urlPath.split("?")[0]);
+  if (!decoded.isOk()) {
+    // The worker sees the raw path in production, so only answer 400 here
+    // when there is no worker to hand it to.
+    if (hasWorker) return false;
+    res.writeHead(400, { "content-type": "text/plain; charset=utf-8" });
+    res.end("Bad request");
+    return true;
+  }
+  const cleanPath = normalize(decoded[0]).replace(/^(\.\.[/\\])+/, "");
   const routePath = cleanPath.replace(/[/\\]+$/, "");
   const isRoot = routePath === "" || routePath === ".";
 
@@ -194,7 +201,7 @@ export function serve(port, staticDir, workerPath, liveReload, spa) {
 
       if (
         staticDir &&
-        (await serveStatic(staticDir, req.method ?? "GET", req.url ?? "/", res, spa && !workerPath))
+        (await serveStatic(staticDir, req.method ?? "GET", req.url ?? "/", res, spa && !workerPath, Boolean(workerPath)))
       ) {
         return;
       }
