@@ -1,5 +1,19 @@
 import giolt/internal/link
 
+// PowerShell 5 saves UTF-8 with a byte-order mark. The file is read and
+// written back with it, so the editor that wrote it still opens it the same.
+pub fn edits_a_file_that_starts_with_a_byte_order_mark_test() {
+  let mark = "\u{FEFF}"
+  let source =
+    mark <> "name = \"app\"\n\n[tools.giolt]\nartifact = \"./site\"\n"
+
+  let assert Ok(linked) = link.set_project(source, 42)
+  assert linked
+    == mark
+    <> "name = \"app\"\n\n[tools.giolt]\nproject = 42\nartifact = \"./site\"\n"
+  assert link.remove_project(linked) == Ok(source)
+}
+
 pub fn replaces_the_project_line_in_tools_giolt_test() {
   let source =
     "name = \"app\"\n\n[tools.giolt]\n# where CI deploys\nproject = 7\nport = 4000\n"

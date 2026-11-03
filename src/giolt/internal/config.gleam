@@ -3,6 +3,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/regexp
 import gleam/result
+import gleam/string
 import tom
 
 pub type Target {
@@ -63,6 +64,19 @@ pub fn default(package: String, target: Target) -> Config {
   )
 }
 
+// PowerShell 5 and some editors save UTF-8 with a byte-order mark, and the
+// TOML parser does not accept one. Gleam itself reads such a gleam.toml, so
+// this must too.
+const byte_order_mark = "\u{FEFF}"
+
+pub fn split_byte_order_mark(source: String) -> #(String, String) {
+  // Not drop_start: the mark and the character after it form one grapheme.
+  case string.split_once(source, byte_order_mark) {
+    Ok(#("", rest)) -> #(byte_order_mark, rest)
+    _ -> #("", source)
+  }
+}
+
 pub fn parse(source: String) -> Result(Config, Error) {
   parse_with(source, None)
 }
@@ -71,10 +85,13 @@ pub fn parse_with(
   source: String,
   settings: Option(String),
 ) -> Result(Config, Error) {
+  let #(_, source) = split_byte_order_mark(source)
   use root <- result.try(tom.parse(source) |> result.replace_error(InvalidToml))
   use toml <- result.try(case settings {
     None -> Ok(root)
-    Some(text) -> tom.parse(text) |> result.replace_error(InvalidSettingsToml)
+    Some(text) ->
+      tom.parse(split_byte_order_mark(text).1)
+      |> result.replace_error(InvalidSettingsToml)
   })
   use package <- result.try(
     tom.get_string(root, ["name"]) |> result.replace_error(MissingName),

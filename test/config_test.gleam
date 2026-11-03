@@ -1,6 +1,13 @@
 import giolt/internal/config.{Erlang, Javascript}
 import gleam/option.{None, Some}
 
+pub fn gleam_toml_with_a_byte_order_mark_is_read_test() {
+  let assert Ok(config) =
+    config.parse("\u{FEFF}name = \"app\"\ntarget = \"javascript\"\n")
+
+  assert config.target == Javascript
+}
+
 pub fn entry_defaults_to_the_package_module_test() {
   let source = "name = \"my_app\"\nversion = \"1.0.0\"\n"
 
