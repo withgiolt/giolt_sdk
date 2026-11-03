@@ -1,6 +1,6 @@
 import giolt/internal/cli.{
-  Build, CreateProject, DeleteProject, Deploy, Dev, Invalid, ListProjects, Login,
-  Logout, RenameProject, Run, ShowUsage, Usage, Whoami,
+  Build, CreateProject, DeleteProject, Deploy, Dev, Invalid, Link, ListProjects,
+  Login, Logout, RenameProject, Run, ShowUsage, Unlink, Usage, Whoami,
 }
 import gleam/option.{None, Some}
 import gleam/string
@@ -9,7 +9,7 @@ pub fn each_command_is_recognised_test() {
   assert cli.parse(["build"]) == Run(Build(config: None))
   assert cli.parse(["dev"]) == Run(Dev(config: None))
   assert cli.parse(["deploy"])
-    == Run(Deploy(preview: False, artifact: None, config: None))
+    == Run(Deploy(preview: False, artifact: None, project: None, config: None))
 }
 
 pub fn no_arguments_shows_usage_test() {
@@ -49,9 +49,14 @@ pub fn extra_arguments_are_invalid_test() {
 
 pub fn deploy_flags_are_read_test() {
   assert cli.parse(["deploy", "--preview"])
-    == Run(Deploy(preview: True, artifact: None, config: None))
+    == Run(Deploy(preview: True, artifact: None, project: None, config: None))
   assert cli.parse(["deploy", "--artifact", "site"])
-    == Run(Deploy(preview: False, artifact: Some("site"), config: None))
+    == Run(Deploy(
+      preview: False,
+      artifact: Some("site"),
+      project: None,
+      config: None,
+    ))
 }
 
 pub fn deploy_message_is_no_longer_a_flag_test() {
@@ -74,7 +79,12 @@ pub fn deploy_usage_lists_its_flags_test() {
 
 pub fn deploy_artifact_flag_is_read_test() {
   assert cli.parse(["deploy", "--artifact", "./site"])
-    == Run(Deploy(preview: False, artifact: Some("./site"), config: None))
+    == Run(Deploy(
+      preview: False,
+      artifact: Some("./site"),
+      project: None,
+      config: None,
+    ))
 }
 
 pub fn deploy_usage_lists_the_artifact_flag_test() {
@@ -92,8 +102,29 @@ pub fn config_flag_is_read_on_every_command_test() {
     == Run(Deploy(
       preview: True,
       artifact: None,
+      project: None,
       config: Some("giolt.dash.toml"),
     ))
+  assert cli.parse(["link", "blog", "--config", "giolt.dash.toml"])
+    == Run(Link(name: "blog", config: Some("giolt.dash.toml")))
+  assert cli.parse(["unlink", "--config", "giolt.dash.toml"])
+    == Run(Unlink(config: Some("giolt.dash.toml")))
+}
+
+pub fn deploy_takes_a_project_name_test() {
+  assert cli.parse(["deploy", "--project", "blog"])
+    == Run(Deploy(
+      preview: False,
+      artifact: None,
+      project: Some("blog"),
+      config: None,
+    ))
+}
+
+pub fn link_needs_a_name_test() {
+  let assert Invalid(_) = cli.parse(["link"])
+  assert cli.parse(["link", "blog"]) == Run(Link(name: "blog", config: None))
+  assert cli.parse(["unlink"]) == Run(Unlink(config: None))
 }
 
 pub fn config_flag_without_a_value_is_invalid_test() {

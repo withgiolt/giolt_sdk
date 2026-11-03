@@ -28,6 +28,10 @@ pub type Deployment {
   Deployment(url: String, status: String)
 }
 
+pub type Deployed {
+  Deployed(id: String, url: String, preview: Bool)
+}
+
 pub type Me {
   Me(
     email: String,
@@ -142,6 +146,18 @@ pub fn delete_project(client: Client, id: Int) -> Promise(Result(Nil, Error)) {
   send_empty(client.api_url, delete_project_request(client, id))
 }
 
+pub fn create_deployment(
+  client: Client,
+  project_id: Int,
+  body: Json,
+) -> Promise(Result(Deployed, Error)) {
+  send_json(
+    client.api_url,
+    create_deployment_request(client, project_id, body),
+    deployed_decoder(),
+  )
+}
+
 pub fn usage(client: Client) -> Promise(Result(Usage, Error)) {
   send_json(client.api_url, usage_request(client), usage_decoder())
 }
@@ -211,6 +227,19 @@ pub fn delete_project_request(
   id: Int,
 ) -> Result(Request(String), Error) {
   build(client, http.Delete, project_path(id), None)
+}
+
+pub fn create_deployment_request(
+  client: Client,
+  project_id: Int,
+  body: Json,
+) -> Result(Request(String), Error) {
+  build(
+    client,
+    http.Post,
+    project_path(project_id) <> "/deployments",
+    Some(body),
+  )
 }
 
 pub fn usage_request(client: Client) -> Result(Request(String), Error) {
@@ -406,6 +435,13 @@ fn deployment_decoder() -> Decoder(Deployment) {
   use url <- decode.field("url", decode.string)
   use status <- decode.field("status", decode.string)
   decode.success(Deployment(url:, status:))
+}
+
+pub fn deployed_decoder() -> Decoder(Deployed) {
+  use id <- decode.field("id", decode.string)
+  use url <- decode.field("url", decode.string)
+  use preview <- decode.field("preview", decode.bool)
+  decode.success(Deployed(id:, url:, preview:))
 }
 
 pub fn me_decoder() -> Decoder(Me) {

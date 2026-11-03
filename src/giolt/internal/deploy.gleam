@@ -1,5 +1,6 @@
-import envie
+import giolt/internal/api.{type Client, type Deployed, Client}
 import giolt/internal/bundle
+import giolt/internal/credentials.{type Credential}
 import giolt/internal/io
 import gleam/bit_array
 import gleam/dynamic/decode
@@ -25,27 +26,26 @@ type Artifact {
   AssetsOnly(path: String)
 }
 
-type TokenSource {
-  Explicit(value: String)
-  FromEnv(var: String)
-}
-
 pub opaque type Config(has_artifact) {
-  Config(
-    artifact: Option(Artifact),
-    preview: Bool,
-    spa: Bool,
-    token: TokenSource,
-    api_url: String,
-  )
+  Config(artifact: Option(Artifact), preview: Bool, spa: Bool)
 }
 
-pub type Deployment {
-  Deployment(id: String, url: String, preview: Bool)
+pub type Destination {
+  // POST /api/deploy, where the key itself names the project.
+  WithDeployKey(client: Client)
+  ToProject(id: Int, client: Client)
+}
+
+pub type Route {
+  Ready(Destination)
+  Lookup(name: String, client: Client)
 }
 
 pub type Error {
-  MissingToken(env_var: String)
+  MissingToken
+  NoProject
+  NameNeedsUserToken(name: String)
+  Api(api.Error)
   ArtifactNotFound(path: String)
   ArtifactEmpty(path: String)
   CannotReadArtifact(path: String)
@@ -54,38 +54,17 @@ pub type Error {
 }
 
 pub type Plan {
-  Plan(
-    artifact_dir: String,
-    assets_only: Bool,
-    preview: Bool,
-    spa: Bool,
-    token: String,
-    api_url: String,
-  )
+  Plan(artifact_dir: String, assets_only: Bool, preview: Bool, spa: Bool)
 }
 
-const default_token_env = "GIOLT_TOKEN"
-
-const default_api_url = "https://dash.giolt.com"
-
 const default_artifact_dir = "./dist"
-
-/// Overrides `api_url` from [tools.giolt] when set, to point one deploy at a
-/// local server without editing gleam.toml.
-const api_url_env = "GIOLT_API_URL"
 
 /// Files under this directory (relative to the artifact dir) are uploaded as
 /// static assets; everything else is uploaded as a worker module.
 const static_subdir = "static"
 
 pub fn new() -> Config(NoArtifact) {
-  Config(
-    artifact: None,
-    preview: False,
-    spa: False,
-    token: FromEnv(default_token_env),
-    api_url: default_api_url,
-  )
+  Config(artifact: None, preview: False, spa: False)
 }
 
 pub fn artifact(
@@ -113,8 +92,8 @@ fn set_artifact(
   config: Config(has_artifact),
   artifact: Artifact,
 ) -> Config(HasArtifact) {
-  let Config(preview:, spa:, token:, api_url:, ..) = config
-  Config(artifact: Some(artifact), preview:, spa:, token:, api_url:)
+  let Config(preview:, spa:, ..) = config
+  Config(artifact: Some(artifact), preview:, spa:)
 }
 
 pub fn preview(
@@ -131,51 +110,72 @@ pub fn spa(config: Config(has_artifact), is_spa: Bool) -> Config(has_artifact) {
   Config(..config, spa: is_spa)
 }
 
-pub fn token(
-  config: Config(has_artifact),
-  value: String,
-) -> Config(has_artifact) {
-  Config(..config, token: Explicit(value))
-}
-
-pub fn token_from_env(
-  config: Config(has_artifact),
-  var: String,
-) -> Config(has_artifact) {
-  Config(..config, token: FromEnv(var))
-}
-
-pub fn api_url(
-  config: Config(has_artifact),
-  url: String,
-) -> Config(has_artifact) {
-  Config(..config, api_url: url)
-}
-
-pub fn run(config: Config(HasArtifact)) -> Promise(Result(Deployment, Error)) {
-  let plan_result = {
-    use plan <- result.try(plan(config))
-    use _ <- result.try(check_artifact(plan.artifact_dir))
-    Ok(plan)
+// A user token in GIOLT_TOKEN goes to GIOLT_API_URL or the configured
+// `api_url`, like a deploy key always has. A stored login only goes to the
+// server that issued it.
+pub fn route(
+  project project: Option(String),
+  linked linked: Option(Int),
+  env_token env_token: Option(String),
+  env_api_url env_api_url: Option(String),
+  config_api_url config_api_url: String,
+  stored stored: Option(Credential),
+) -> Result(Route, Error) {
+  let env_client = case non_empty(env_token) {
+    Some(token) -> {
+      let api_url = non_empty(env_api_url) |> option.unwrap(config_api_url)
+      Some(#(credentials.token_kind(token), Client(api_url:, token:)))
+    }
+    None -> None
+  }
+  // GIOLT_TOKEN wins outright, so a CI deploy key is never swapped for a
+  // login stored on the same machine.
+  let #(user, deploy_key) = case env_client, stored {
+    Some(#(credentials.UserToken, client)), _ -> #(Some(client), None)
+    Some(#(credentials.DeployKey, client)), _ -> #(None, Some(client))
+    None, Some(credential) -> #(
+      Some(Client(api_url: credential.api_url, token: credential.token)),
+      None,
+    )
+    None, None -> #(None, None)
   }
 
-  case plan_result {
+  case project, linked, user, deploy_key {
+    Some(name), _, Some(client), _ -> Ok(Lookup(name:, client:))
+    Some(name), _, None, Some(_) -> Error(NameNeedsUserToken(name))
+    None, Some(id), Some(client), _ | None, Some(id), None, Some(client) ->
+      Ok(Ready(ToProject(id:, client:)))
+    None, None, _, Some(client) -> Ok(Ready(WithDeployKey(client)))
+    None, None, Some(_), None -> Error(NoProject)
+    _, _, None, None -> Error(MissingToken)
+  }
+}
+
+fn non_empty(value: Option(String)) -> Option(String) {
+  case value {
+    Some("") -> None
+    _ -> value
+  }
+}
+
+pub fn run(
+  config: Config(HasArtifact),
+  destination: Destination,
+) -> Promise(Result(Deployed, Error)) {
+  let plan = plan(config)
+  case check_artifact(plan.artifact_dir) {
     Error(error) -> promise.resolve(Error(error))
-    Ok(plan) -> submit(plan)
+    Ok(Nil) -> submit(plan, destination)
   }
 }
 
-pub fn plan(config: Config(HasArtifact)) -> Result(Plan, Error) {
-  use token <- result.try(resolve_token(config.token))
-
-  Ok(Plan(
+pub fn plan(config: Config(HasArtifact)) -> Plan {
+  Plan(
     artifact_dir: artifact_dir(config.artifact),
     assets_only: is_assets_only(config.artifact),
     preview: config.preview,
     spa: config.spa,
-    token: token,
-    api_url: envie.get_string(api_url_env, config.api_url),
-  ))
+  )
 }
 
 fn artifact_dir(artifact: Option(Artifact)) -> String {
@@ -191,14 +191,6 @@ fn is_assets_only(artifact: Option(Artifact)) -> Bool {
   case artifact {
     Some(AssetsOnly(_)) -> True
     _ -> False
-  }
-}
-
-fn resolve_token(source: TokenSource) -> Result(String, Error) {
-  case source {
-    Explicit(value) -> Ok(value)
-    FromEnv(var) ->
-      envie.require_string(var) |> result.replace_error(MissingToken(var))
   }
 }
 
@@ -222,7 +214,10 @@ fn check_artifact(path: String) -> Result(Nil, Error) {
   }
 }
 
-fn submit(plan: Plan) -> Promise(Result(Deployment, Error)) {
+fn submit(
+  plan: Plan,
+  destination: Destination,
+) -> Promise(Result(Deployed, Error)) {
   io.println_info(
     "Deploying "
     <> plan.artifact_dir
@@ -242,7 +237,15 @@ fn submit(plan: Plan) -> Promise(Result(Deployment, Error)) {
 
   case files {
     Error(error) -> promise.resolve(Error(error))
-    Ok(#(modules, assets)) -> post_deploy(plan, modules, assets)
+    Ok(#(modules, assets)) -> {
+      let body = deploy_body(plan, modules, assets)
+      case destination {
+        WithDeployKey(client) -> post_with_deploy_key(client, body)
+        ToProject(id:, client:) ->
+          api.create_deployment(client, id, body)
+          |> promise.map(result.map_error(_, Api))
+      }
+    }
   }
 }
 
@@ -302,29 +305,33 @@ fn strip_trailing_slash(path: String) -> String {
   }
 }
 
-fn post_deploy(
+fn deploy_body(
   plan: Plan,
   modules: List(#(String, String)),
   assets: List(#(String, String)),
-) -> Promise(Result(Deployment, Error)) {
-  case request.to(plan.api_url <> "/api/deploy") {
+) -> json.Json {
+  json.object([
+    #("preview", json.bool(plan.preview)),
+    #("spa", json.bool(plan.spa)),
+    #("modules", json.array(modules, file_json)),
+    #("assets", json.array(assets, file_json)),
+  ])
+}
+
+fn post_with_deploy_key(
+  client: Client,
+  body: json.Json,
+) -> Promise(Result(Deployed, Error)) {
+  case request.to(client.api_url <> "/api/deploy") {
     Error(Nil) ->
-      promise.resolve(Error(ApiError(0, "Invalid api_url: " <> plan.api_url)))
+      promise.resolve(Error(ApiError(0, "Invalid api_url: " <> client.api_url)))
     Ok(base_request) -> {
       let req =
         base_request
         |> request.set_method(http.Post)
         |> request.set_header("content-type", "application/json")
-        |> request.set_header("authorization", "Bearer " <> plan.token)
-        |> request.set_body(
-          json.object([
-            #("preview", json.bool(plan.preview)),
-            #("spa", json.bool(plan.spa)),
-            #("modules", json.array(modules, file_json)),
-            #("assets", json.array(assets, file_json)),
-          ])
-          |> json.to_string,
-        )
+        |> request.set_header("authorization", "Bearer " <> client.token)
+        |> request.set_body(json.to_string(body))
 
       use send_result <- promise.await(fetch.send(req))
 
@@ -347,7 +354,7 @@ fn file_json(file: #(String, String)) -> json.Json {
 
 fn handle_response(
   res: response.Response(fetch.FetchBody),
-) -> Promise(Result(Deployment, Error)) {
+) -> Promise(Result(Deployed, Error)) {
   case res.status {
     200 -> {
       use body_result <- promise.await(fetch.read_json_body(res))
@@ -357,7 +364,7 @@ fn handle_response(
             Error(ApiError(res.status, string.inspect(fetch_error))),
           )
         Ok(json_res) ->
-          decode.run(json_res.body, deployment_decoder())
+          decode.run(json_res.body, api.deployed_decoder())
           |> result.replace_error(ApiError(
             res.status,
             "Malformed response body",
@@ -376,17 +383,28 @@ fn handle_response(
   }
 }
 
-fn deployment_decoder() -> decode.Decoder(Deployment) {
-  use id <- decode.field("id", decode.string)
-  use url <- decode.field("url", decode.string)
-  use preview <- decode.field("preview", decode.bool)
-  decode.success(Deployment(id:, url:, preview:))
-}
-
 pub fn describe_error(error: Error) -> String {
   case error {
-    MissingToken(var) ->
-      "No deploy token found. Set the `" <> var <> "` environment variable."
+    MissingToken ->
+      "No token found. Run `giolt login`, or set `"
+      <> credentials.token_env
+      <> "` to a user token or the project's deploy key."
+
+    NoProject ->
+      "No project to deploy to. Run `giolt link <name>` or pass `--project <name>`."
+
+    NameNeedsUserToken(name) ->
+      "Deploying to `"
+      <> name
+      <> "` by name needs a user token, but `"
+      <> credentials.token_env
+      <> "` holds a deploy key. Run `giolt link "
+      <> name
+      <> "` once with a user token so the project id is in gleam.toml, or set `"
+      <> credentials.token_env
+      <> "` to a user token."
+
+    Api(error) -> api.describe_error(error)
 
     ArtifactNotFound(path) ->
       "No such artifact directory: " <> path <> ". Run `giolt build` first."
@@ -405,7 +423,7 @@ pub fn describe_error(error: Error) -> String {
   }
 }
 
-pub fn print_result(result: Result(Deployment, Error)) -> Nil {
+pub fn print_result(result: Result(Deployed, Error)) -> Nil {
   case result {
     Ok(deployment) -> io.println_success("Deployed: " <> deployment.url)
     Error(_) -> Nil
