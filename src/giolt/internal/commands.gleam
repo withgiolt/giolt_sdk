@@ -99,6 +99,7 @@ fn serve_dev(
     },
     worker_path:,
     live_reload: config.live_reload,
+    spa: config.spa,
   )
 
   let _ = stop_watching

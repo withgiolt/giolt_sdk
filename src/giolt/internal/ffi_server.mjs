@@ -60,7 +60,7 @@ async function statFile(path) {
   }
 }
 
-async function serveStatic(staticDir, method, urlPath, res) {
+async function serveStatic(staticDir, method, urlPath, res, spa) {
   const cleanPath = normalize(urlPath.split("?")[0]).replace(
     /^(\.\.[/\\])+/,
     "",
@@ -72,7 +72,7 @@ async function serveStatic(staticDir, method, urlPath, res) {
   if (!filePath && !isRoot && (method === "GET" || method === "HEAD")) {
     filePath = await statFile(join(staticDir, `${routePath}.html`));
   }
-  if (!filePath && isRoot) {
+  if (!filePath && (isRoot || (spa && (method === "GET" || method === "HEAD")))) {
     filePath = await statFile(join(staticDir, "index.html"));
   }
   if (!filePath) return false;
@@ -168,7 +168,7 @@ async function serveWorker(workerPath, req, res) {
   }
 }
 
-export function serve(port, staticDir, workerPath, liveReload) {
+export function serve(port, staticDir, workerPath, liveReload, spa) {
   liveReloadEnabled = liveReload;
 
   const server = createServer(async (req, res) => {
@@ -187,7 +187,7 @@ export function serve(port, staticDir, workerPath, liveReload) {
 
       if (
         staticDir &&
-        (await serveStatic(staticDir, req.method ?? "GET", req.url ?? "/", res))
+        (await serveStatic(staticDir, req.method ?? "GET", req.url ?? "/", res, spa))
       ) {
         return;
       }

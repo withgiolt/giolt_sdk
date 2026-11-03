@@ -5,8 +5,9 @@ pub fn serve(
   static_dir static_dir: Option(String),
   worker_path worker_path: String,
   live_reload live_reload: Bool,
+  spa spa: Bool,
 ) -> Nil {
-  do_serve(port, option.unwrap(static_dir, ""), worker_path, live_reload)
+  do_serve(port, option.unwrap(static_dir, ""), worker_path, live_reload, spa)
 }
 
 @external(javascript, "./ffi_server.mjs", "serve")
@@ -15,6 +16,7 @@ fn do_serve(
   static_dir: String,
   worker_path: String,
   live_reload: Bool,
+  spa: Bool,
 ) -> Nil
 
 @external(javascript, "./ffi_server.mjs", "notify_reload")
