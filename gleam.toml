@@ -1,5 +1,5 @@
 name = "giolt"
-version = "0.4.1"
+version = "0.4.2"
 description = "Build, run and deploy Gleam apps on Giolt"
 internal_modules = ["giolt/internal", "giolt/internal/*"]
 target = "javascript"
