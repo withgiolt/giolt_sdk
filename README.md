@@ -61,7 +61,7 @@ are. They write to the `--config` file when you pass one.
 | `giolt projects create NAME` | Creates a project |
 | `giolt projects rename OLD NEW` | Renames a project. The old URL stops working and there is no redirect |
 | `giolt projects delete NAME [--yes]` | Deletes a project and its deployments for good. Asks you to type the name, or needs `--yes` when there is no terminal |
-| `giolt usage` | Shows the account's requests in the current billing period |
+| `giolt usage` | Shows the account's requests against the included amount for the current billing period; `--json` prints it for scripts |
 
 Creating, renaming and deleting need an active subscription; the error says
 where to set one up.

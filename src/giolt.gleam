@@ -42,6 +42,6 @@ fn run(command: cli.Command) -> Promise(Result(Nil, String)) {
     cli.CreateProject(name:) -> commands.create_project(name:)
     cli.RenameProject(from:, to:) -> commands.rename_project(from:, to:)
     cli.DeleteProject(name:, yes:) -> commands.delete_project(name:, yes:)
-    cli.ShowUsage -> commands.usage()
+    cli.ShowUsage(json:) -> commands.usage(json:)
   }
 }

@@ -28,11 +28,9 @@ const javascript_steps = 3
 
 const interface_path = "./build/.giolt-interface.json"
 
-const login_expired =
-  "The login code expired before it was approved. Run `giolt login` to get a new one."
+const login_expired = "The login code expired before it was approved. Run `giolt login` to get a new one."
 
-const env_token_untouched =
-  "`GIOLT_TOKEN` is set. Logging out only clears the stored token, so commands keep using GIOLT_TOKEN."
+const env_token_untouched = "`GIOLT_TOKEN` is set. Logging out only clears the stored token, so commands keep using GIOLT_TOKEN."
 
 pub fn build(
   config config_path: Option(String),
@@ -727,15 +725,15 @@ fn ask_to_type(name: String) -> Promise(Bool) {
   confirm.accepts(expected: name, typed:)
 }
 
-pub fn usage() -> Promise(Result(Nil, String)) {
+pub fn usage(json json: Bool) -> Promise(Result(Nil, String)) {
   use _, client <- signed_in()
   use usage <- promise.map(api_call(api.usage(client)))
   use usage <- result.map(usage)
 
-  stdio.println("Requests: " <> int.to_string(usage.requests))
-  stdio.println(
-    "Period:   " <> usage.period_start <> " to " <> usage.period_end,
-  )
+  case json {
+    True -> stdio.println(api.usage_json(usage))
+    False -> list.each(api.describe_usage(usage), stdio.println)
+  }
 }
 
 fn signed_in(

@@ -41,8 +41,15 @@ pub type Me {
   )
 }
 
+// `included` is missing from servers that predate it. The period is null for
+// an account with no billing customer yet, which has used nothing.
 pub type Usage {
-  Usage(requests: Int, period_start: String, period_end: String)
+  Usage(
+    requests: Int,
+    included: Option(Int),
+    period_start: Option(String),
+    period_end: Option(String),
+  )
 }
 
 pub type DeviceLogin {
@@ -457,9 +464,42 @@ pub fn me_decoder() -> Decoder(Me) {
 
 pub fn usage_decoder() -> Decoder(Usage) {
   use requests <- decode.field("requests", decode.int)
-  use period_start <- decode.field("period_start", decode.string)
-  use period_end <- decode.field("period_end", decode.string)
-  decode.success(Usage(requests:, period_start:, period_end:))
+  use included <- decode.optional_field(
+    "included",
+    None,
+    decode.optional(decode.int),
+  )
+  use period_start <- decode.field(
+    "period_start",
+    decode.optional(decode.string),
+  )
+  use period_end <- decode.field("period_end", decode.optional(decode.string))
+  decode.success(Usage(requests:, included:, period_start:, period_end:))
+}
+
+pub fn describe_usage(usage: Usage) -> List(String) {
+  let requests = case usage.included {
+    Some(included) ->
+      int.to_string(usage.requests) <> " of " <> int.to_string(included)
+    None -> int.to_string(usage.requests)
+  }
+  let period = case usage.period_start, usage.period_end {
+    Some(start), Some(end) -> start <> " to " <> end
+    _, _ -> "no billing period yet"
+  }
+  ["Requests: " <> requests, "Period:   " <> period]
+}
+
+// The same fields and names as the API, so a script reads one shape from
+// either.
+pub fn usage_json(usage: Usage) -> String {
+  json.object([
+    #("requests", json.int(usage.requests)),
+    #("included", json.nullable(usage.included, json.int)),
+    #("period_start", json.nullable(usage.period_start, json.string)),
+    #("period_end", json.nullable(usage.period_end, json.string)),
+  ])
+  |> json.to_string
 }
 
 pub fn device_login_decoder() -> Decoder(DeviceLogin) {
