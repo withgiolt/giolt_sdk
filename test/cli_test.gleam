@@ -1,4 +1,7 @@
-import giolt/internal/cli.{Build, Deploy, Dev, Invalid, Run, Usage}
+import giolt/internal/cli.{
+  Build, CreateProject, DeleteProject, Deploy, Dev, Invalid, ListProjects, Login,
+  Logout, RenameProject, Run, ShowUsage, Usage, Whoami,
+}
 import gleam/option.{None, Some}
 import gleam/string
 
@@ -97,4 +100,68 @@ pub fn config_flag_without_a_value_is_invalid_test() {
   let assert Invalid(text) = cli.parse(["dev", "--config"])
 
   assert string.contains(text, "config")
+}
+
+pub fn account_commands_are_recognised_test() {
+  assert cli.parse(["login", "--token", "giolt_abc"])
+    == Run(Login(token: Some("giolt_abc")))
+  assert cli.parse(["login"]) == Run(Login(token: None))
+  assert cli.parse(["login", "--token", "-"]) == Run(Login(token: Some("-")))
+  assert cli.parse(["logout"]) == Run(Logout)
+  assert cli.parse(["whoami"]) == Run(Whoami)
+  assert cli.parse(["usage"]) == Run(ShowUsage)
+}
+
+pub fn projects_subcommands_are_recognised_test() {
+  assert cli.parse(["projects"]) == Run(ListProjects)
+  assert cli.parse(["projects", "create", "blog"])
+    == Run(CreateProject(name: "blog"))
+  assert cli.parse(["projects", "rename", "blog", "notes"])
+    == Run(RenameProject(from: "blog", to: "notes"))
+  assert cli.parse(["projects", "delete", "blog"])
+    == Run(DeleteProject(name: "blog", yes: False))
+}
+
+pub fn delete_reads_yes_on_either_side_of_the_name_test() {
+  assert cli.parse(["projects", "delete", "blog", "--yes"])
+    == Run(DeleteProject(name: "blog", yes: True))
+  assert cli.parse(["projects", "delete", "--yes", "blog"])
+    == Run(DeleteProject(name: "blog", yes: True))
+}
+
+pub fn projects_subcommands_need_their_names_test() {
+  let assert Invalid(create) = cli.parse(["projects", "create"])
+  let assert Invalid(rename) = cli.parse(["projects", "rename", "blog"])
+
+  assert string.contains(create, "name")
+  assert string.contains(rename, "new")
+}
+
+pub fn an_unknown_projects_subcommand_is_invalid_test() {
+  let assert Invalid(text) = cli.parse(["projects", "frobnicate"])
+
+  assert string.contains(text, "frobnicate")
+}
+
+pub fn projects_usage_lists_its_subcommands_test() {
+  let assert Usage(text) = cli.parse(["projects", "--help"])
+
+  assert string.contains(text, "create")
+  assert string.contains(text, "rename")
+  assert string.contains(text, "delete")
+}
+
+pub fn delete_usage_lists_yes_test() {
+  let assert Usage(text) = cli.parse(["projects", "delete", "--help"])
+
+  assert string.contains(text, "--yes")
+}
+
+pub fn usage_lists_the_account_commands_test() {
+  let assert Usage(text) = cli.parse([])
+
+  assert string.contains(text, "login")
+  assert string.contains(text, "whoami")
+  assert string.contains(text, "projects")
+  assert string.contains(text, "usage")
 }

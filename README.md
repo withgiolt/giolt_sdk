@@ -34,6 +34,47 @@ and fails with the expected and found types when it does not match.
 
 `deploy` reads the token from `GIOLT_TOKEN`. `GIOLT_API_URL` overrides `api_url`.
 
+## Account and projects
+
+| Command | Does |
+| --- | --- |
+| `giolt login` | Shows a code and opens the dashboard so you can approve it in the browser, then stores the token |
+| `giolt login --token -` | Reads a token made on the dashboard's Tokens page from stdin and stores it. It starts with `giolt_`; deploy keys are refused. `--token TOKEN` also works, but leaves the token in your shell history |
+| `giolt logout` | Revokes the stored token and deletes it. If the revoke fails, the file is still deleted and you are told to revoke the token on the dashboard |
+| `giolt whoami` | Shows the account email, the token's name, scopes and expiry, and where the token came from |
+| `giolt projects` | Lists your projects with their URL and latest deployment status |
+| `giolt projects create NAME` | Creates a project |
+| `giolt projects rename OLD NEW` | Renames a project. The old URL stops working and there is no redirect |
+| `giolt projects delete NAME [--yes]` | Deletes a project and its deployments for good. Asks you to type the name, or needs `--yes` when there is no terminal |
+| `giolt usage` | Shows the account's requests in the current billing period |
+
+Creating, renaming and deleting need an active subscription; the error says
+where to set one up.
+
+`giolt login` stores the token in `credentials.json`, readable only by you, in:
+
+- `$XDG_CONFIG_HOME/giolt/`, or `~/.config/giolt/` when that is unset (Linux and macOS)
+- `%APPDATA%\giolt\` (Windows)
+
+```sh
+pbpaste | gleam run -m giolt login --token -
+```
+
+Logging in again revokes the token it replaces.
+
+`GIOLT_TOKEN` takes precedence over the stored token, so CI can set it without
+logging in. These commands need a user token, so a deploy key in `GIOLT_TOKEN`
+is refused. They never read `gleam.toml`, so a project's `api_url` cannot send
+your token elsewhere:
+
+- `giolt login` uses `GIOLT_API_URL`, or `https://dash.giolt.com` when that is
+  unset, and stores that URL with the token.
+- The stored token is only ever sent to the URL stored with it.
+- `GIOLT_TOKEN` is sent to `GIOLT_API_URL`, or `https://dash.giolt.com`.
+
+`giolt logout` only removes the stored token; it does not unset `GIOLT_TOKEN`.
+`giolt deploy` still reads only `GIOLT_TOKEN`.
+
 ## Configuration
 
 Everything is optional and lives under `[tools.giolt]` in your `gleam.toml`, or
@@ -51,7 +92,7 @@ the file leaves out take their defaults):
 | `watch` | `["src"]`, plus `assets` | Directories `dev` watches |
 | `port` | `3000` | `dev` server port |
 | `live_reload` | `true` | Reload the browser after a rebuild |
-| `api_url` | `"https://dash.giolt.com"` | Giolt API used by `deploy` |
+| `api_url` | `"https://dash.giolt.com"` | Giolt API used by `deploy`. The account commands ignore it |
 | `prebuild` | none | Shell command run before every build, such as `gleam run -m docs/build` |
 | `artifact` | none | Deploy this directory as a static site. Skips the `handle` check, the compile and the bundle |
 

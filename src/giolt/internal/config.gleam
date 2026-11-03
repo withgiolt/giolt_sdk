@@ -41,6 +41,8 @@ pub type Error {
 
 pub const default_outdir = "./dist"
 
+pub const default_api_url = "https://dash.giolt.com"
+
 pub fn default(package: String, target: Target) -> Config {
   Config(
     package:,
@@ -53,7 +55,7 @@ pub fn default(package: String, target: Target) -> Config {
     watch: ["src"],
     port: 3000,
     live_reload: True,
-    api_url: "https://dash.giolt.com",
+    api_url: default_api_url,
     prebuild: None,
     artifact: None,
   )

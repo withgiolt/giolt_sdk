@@ -84,10 +84,13 @@ from a pure function in `src/giolt/internal/`, each with a matching
 | `esbuild_bin.gleam` | Installing and running the esbuild binary |
 | `bundle.gleam` | Bundling the compiled entry into `outdir` with the worker shim, plus static assets |
 | `deploy.gleam` | Planning and posting a deploy to the Giolt API |
+| `api.gleam` | The `/api/v1` client: requests, response and error decoding, the device-login poll step, what a failed revoke means, which login URLs may be opened |
+| `credentials.gleam` + `ffi_credentials.mjs` | Where `credentials.json` lives, reading and writing it, and choosing between it and `GIOLT_TOKEN` |
+| `confirm.gleam` | Whether `projects delete` proceeds, asks you to type the name, or refuses |
 | `shim.gleam` | The worker entry template esbuild bundles |
 | `server.gleam` + `ffi_server.mjs` | The dev HTTP server (assets, worker hot reload, live-reload SSE) |
 | `watcher.gleam` + `ffi_watcher.mjs` | Recursive file watching |
-| `process.gleam` + `ffi_process.mjs` | Running subprocesses and shell hooks, probing tools, exiting |
+| `process.gleam` + `ffi_process.mjs` | Running subprocesses and shell hooks, probing tools, reading a line from stdin, opening a URL, sleeping, exiting |
 | `io.gleam` | Styled output and the glitzer progress line |
 | `esgleam/` | Vendored (Apache-2.0, forked) esbuild platform detection and tarball extraction only; do not add unrelated code here |
 
@@ -130,9 +133,11 @@ only reads, writes and calls it.
   worker. There is no `handle` check or bundling, and it works for either target.
 - **Hooks are command strings.** `prebuild` runs through the shell before every
   build, including each `dev` rebuild. There is no closure API.
-- **No env-var handling beyond deploy.** `GIOLT_TOKEN` (authentication) and
-  `GIOLT_API_URL` (overrides `api_url`) are read in `deploy.gleam`. No `.env`
-  loading, no `PUBLIC_`/`PRIVATE_` inlining.
+- **No env-var handling beyond the API.** `GIOLT_TOKEN` (authentication) and
+  `GIOLT_API_URL` (overrides `api_url`) are read in `deploy.gleam` and, for the
+  account commands, through `credentials.resolve`. `XDG_CONFIG_HOME` and
+  `APPDATA` only locate `credentials.json`. No `.env` loading, no
+  `PUBLIC_`/`PRIVATE_` inlining.
 - **No glob or ignore matching in `dev`.** `watch` takes directories.
 - **Node 20+ and Bun are the supported runtimes** (`gleam run -m giolt` and
   `gleam run --runtime bun -m giolt`); Deno is not supported. Node 20 is the
