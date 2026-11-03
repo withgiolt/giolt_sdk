@@ -1,3 +1,4 @@
+import giolt/internal/config
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -15,6 +16,12 @@ type Line {
 // catches layouts the line scan can't see, such as `tools = { giolt = ... }` or
 // a header inside a multi-line string.
 pub fn set_project(source: String, id: Int) -> Result(String, Nil) {
+  let #(mark, source) = config.split_byte_order_mark(source)
+  use text <- result.map(set_project_in(source, id))
+  mark <> text
+}
+
+fn set_project_in(source: String, id: Int) -> Result(String, Nil) {
   let eol = line_ending(source)
   let lines = label(string.split(source, eol))
   let line = "project = " <> int.to_string(id)
@@ -36,6 +43,12 @@ pub fn set_project(source: String, id: Int) -> Result(String, Nil) {
 }
 
 pub fn remove_project(source: String) -> Result(String, Nil) {
+  let #(mark, source) = config.split_byte_order_mark(source)
+  use text <- result.map(remove_project_in(source))
+  mark <> text
+}
+
+fn remove_project_in(source: String) -> Result(String, Nil) {
   let eol = line_ending(source)
   let lines = label(string.split(source, eol))
   let text = join(list.filter(lines, fn(line) { !is_linked_line(line) }), eol)
