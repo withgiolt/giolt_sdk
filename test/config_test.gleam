@@ -99,6 +99,7 @@ live_reload = false
 api_url = \"http://localhost:4000\"
 prebuild = \"gleam run -m docs/build\"
 artifact = \"./site\"
+project = 42
 "
 
 pub fn every_key_is_read_from_tools_giolt_test() {
@@ -117,6 +118,7 @@ pub fn every_key_is_read_from_tools_giolt_test() {
       api_url: "http://localhost:4000",
       prebuild: Some("gleam run -m docs/build"),
       artifact: Some("./site"),
+      project: Some(42),
     ))
 }
 
@@ -133,6 +135,7 @@ pub fn defaults_apply_when_no_keys_are_set_test() {
   assert parsed.api_url == "https://dash.giolt.com"
   assert parsed.prebuild == None
   assert parsed.artifact == None
+  assert parsed.project == None
 }
 
 pub fn assets_directory_is_watched_by_default_test() {
@@ -183,6 +186,11 @@ pub fn wrongly_typed_keys_are_rejected_test() {
     == Error(config.InvalidValue(key: "artifact", expected: "a string"))
   assert parse("api_url = []")
     == Error(config.InvalidValue(key: "api_url", expected: "a string"))
+  assert parse("project = \"blog\"")
+    == Error(config.InvalidValue(
+      key: "project",
+      expected: "a project id, set by `giolt link`",
+    ))
 }
 
 pub fn port_outside_the_valid_range_is_rejected_test() {
@@ -222,6 +230,18 @@ pub fn settings_file_without_tools_giolt_means_all_defaults_test() {
 
   assert config.parse_with(source, Some("# nothing here\n"))
     == Ok(config.default("my_app", Javascript))
+}
+
+pub fn settings_file_carries_its_own_project_test() {
+  let source =
+    "name = \"my_app\"\ntarget = \"javascript\"\n\n[tools.giolt]\nproject = 1\n"
+
+  let assert Ok(own) =
+    config.parse_with(source, Some("[tools.giolt]\nproject = 2\n"))
+  let assert Ok(none) = config.parse_with(source, Some("[tools.giolt]\n"))
+
+  assert own.project == Some(2)
+  assert none.project == None
 }
 
 pub fn invalid_settings_file_is_reported_apart_from_gleam_toml_test() {

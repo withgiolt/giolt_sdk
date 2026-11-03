@@ -83,7 +83,8 @@ from a pure function in `src/giolt/internal/`, each with a matching
 | `esbuild.gleam` | The esbuild argument list (`Plan -> List(String)`), no process spawned |
 | `esbuild_bin.gleam` | Installing and running the esbuild binary |
 | `bundle.gleam` | Bundling the compiled entry into `outdir` with the worker shim, plus static assets |
-| `deploy.gleam` | Planning and posting a deploy to the Giolt API |
+| `deploy.gleam` | Choosing the deploy's project and token (`route`), then posting the deploy to the Giolt API |
+| `link.gleam` | Setting and removing `project` under `[tools.giolt]` as a text edit |
 | `api.gleam` | The `/api/v1` client: requests, response and error decoding, the device-login poll step, what a failed revoke means, which login URLs may be opened |
 | `credentials.gleam` + `ffi_credentials.mjs` | Where `credentials.json` lives, reading and writing it, and choosing between it and `GIOLT_TOKEN` |
 | `confirm.gleam` | Whether `projects delete` proceeds, asks you to type the name, or refuses |
@@ -134,8 +135,8 @@ only reads, writes and calls it.
 - **Hooks are command strings.** `prebuild` runs through the shell before every
   build, including each `dev` rebuild. There is no closure API.
 - **No env-var handling beyond the API.** `GIOLT_TOKEN` (authentication) and
-  `GIOLT_API_URL` (overrides `api_url`) are read in `deploy.gleam` and, for the
-  account commands, through `credentials.resolve`. `XDG_CONFIG_HOME` and
+  `GIOLT_API_URL` (overrides `api_url`) are read in `commands.gleam` and passed
+  to `deploy.route` and, for the account commands, `credentials.resolve`. `XDG_CONFIG_HOME` and
   `APPDATA` only locate `credentials.json`. No `.env` loading, no
   `PUBLIC_`/`PRIVATE_` inlining.
 - **No glob or ignore matching in `dev`.** `watch` takes directories.
