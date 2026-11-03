@@ -30,9 +30,24 @@ and fails with the expected and found types when it does not match.
 | --- | --- |
 | `giolt build [--config FILE]` | Checks `handle`, compiles and bundles into `outdir` |
 | `giolt dev [--config FILE]` | Builds, watches `watch`, serves on `port` and reloads on change (JavaScript target) |
-| `giolt deploy [--preview] [--artifact DIR] [--config FILE]` | Builds, then uploads `outdir` to Giolt (JavaScript target). With `artifact`, uploads that directory instead |
+| `giolt deploy [--preview] [--artifact DIR] [--project NAME] [--config FILE]` | Builds, then uploads `outdir` to Giolt (JavaScript target). With `artifact`, uploads that directory instead |
+| `giolt link NAME [--config FILE]` | Writes `project = <id>` under `[tools.giolt]`, so `deploy` needs no flags. Commit the file so CI deploys there too |
+| `giolt unlink [--config FILE]` | Removes that `project` line |
 
-`deploy` reads the token from `GIOLT_TOKEN`. `GIOLT_API_URL` overrides `api_url`.
+`link` and `unlink` edit the file as text, so comments and layout stay as they
+are. They write to the `--config` file when you pass one.
+
+`deploy` picks its project and token like this:
+
+- `--project NAME` wins over the linked `project`. A name needs a user token to
+  look up.
+- The token is `GIOLT_TOKEN` when set, otherwise the one `giolt login` stored.
+- With a project, `deploy` uploads to that project. A deploy key in
+  `GIOLT_TOKEN` can deploy its own linked project.
+- With no project and a deploy key in `GIOLT_TOKEN`, `deploy` works as before:
+  the key names the project.
+- `GIOLT_TOKEN` goes to `GIOLT_API_URL`, then `api_url`. A stored login only
+  goes to the URL it logged in against.
 
 ## Account and projects
 
@@ -73,7 +88,6 @@ your token elsewhere:
 - `GIOLT_TOKEN` is sent to `GIOLT_API_URL`, or `https://dash.giolt.com`.
 
 `giolt logout` only removes the stored token; it does not unset `GIOLT_TOKEN`.
-`giolt deploy` still reads only `GIOLT_TOKEN`.
 
 ## Configuration
 
@@ -95,6 +109,7 @@ the file leaves out take their defaults):
 | `api_url` | `"https://dash.giolt.com"` | Giolt API used by `deploy`. The account commands ignore it |
 | `prebuild` | none | Shell command run before every build, such as `gleam run -m docs/build` |
 | `artifact` | none | Deploy this directory as a static site. Skips the `handle` check, the compile and the bundle |
+| `project` | none | Id of the project `deploy` uploads to. Set by `giolt link` |
 
 ## Erlang target
 

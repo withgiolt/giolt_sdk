@@ -25,6 +25,7 @@ pub type Config {
     api_url: String,
     prebuild: Option(String),
     artifact: Option(String),
+    project: Option(Int),
   )
 }
 
@@ -58,6 +59,7 @@ pub fn default(package: String, target: Target) -> Config {
     api_url: default_api_url,
     prebuild: None,
     artifact: None,
+    project: None,
   )
 }
 
@@ -130,6 +132,12 @@ pub fn parse_with(
     tom.as_string,
     "a string",
   ))
+  use project <- result.try(optional(
+    toml,
+    "project",
+    tom.as_int,
+    "a project id, set by `giolt link`",
+  ))
   use watch <- result.try(with_default(
     toml,
     "watch",
@@ -152,6 +160,7 @@ pub fn parse_with(
     api_url:,
     prebuild:,
     artifact:,
+    project:,
   ))
 }
 

@@ -1,121 +1,168 @@
-import envie
+import giolt/internal/api.{Client}
 import giolt/internal/bundle
-import giolt/internal/deploy
+import giolt/internal/config
+import giolt/internal/credentials.{type Credential, Credential}
+import giolt/internal/deploy.{
+  Lookup, MissingToken, NameNeedsUserToken, NoProject, Ready, ToProject,
+  WithDeployKey,
+}
 import gleam/bit_array
-import gleam/javascript/promise
 import gleam/list
-import gleam/option
+import gleam/option.{type Option, None, Some}
 import gleam/string
 import simplifile
 
-pub fn plan_missing_token_test() {
-  envie.unset("GIOLT_TOKEN")
+const deploy_key = "3f2a9c1e-0000-4000-8000-000000000000"
 
-  let config =
-    deploy.new()
-    |> deploy.artifact("./dist")
+const stored = Credential(token: "giolt_stored", api_url: "http://stored")
 
-  assert deploy.plan(config) == Error(deploy.MissingToken("GIOLT_TOKEN"))
-}
+const env_client = Client(api_url: "http://env", token: "giolt_env")
 
-pub fn run_without_token_fails_before_submitting_test() {
-  envie.unset("GIOLT_TOKEN")
+const stored_client = Client(api_url: "http://stored", token: "giolt_stored")
 
-  use result <- promise.map(
-    deploy.new() |> deploy.artifact("./dist") |> deploy.run,
+const key_client = Client(api_url: "http://env", token: deploy_key)
+
+fn route(
+  project: Option(String),
+  linked: Option(Int),
+  env_token: Option(String),
+  stored: Option(Credential),
+) -> Result(deploy.Route, deploy.Error) {
+  deploy.route(
+    project:,
+    linked:,
+    env_token:,
+    env_api_url: Some("http://env"),
+    config_api_url: "https://config.example",
+    stored:,
   )
-  assert result == Error(deploy.MissingToken("GIOLT_TOKEN"))
 }
 
-pub fn plan_resolves_token_from_env_test() {
-  envie.unset("GIOLT_API_URL")
+pub fn the_target_and_credential_pick_the_route_test() {
+  let rows = [
+    // --project names need a user token to resolve. GIOLT_TOKEN wins over a
+    // stored login, so a deploy key there can't resolve a name.
+    #(
+      Some("blog"),
+      None,
+      Some("giolt_env"),
+      None,
+      Ok(Lookup("blog", env_client)),
+    ),
+    #(Some("blog"), None, None, Some(stored), Ok(Lookup("blog", stored_client))),
+    #(
+      Some("blog"),
+      None,
+      Some(deploy_key),
+      Some(stored),
+      Error(NameNeedsUserToken("blog")),
+    ),
+    #(
+      Some("blog"),
+      None,
+      Some(deploy_key),
+      None,
+      Error(NameNeedsUserToken("blog")),
+    ),
+    #(
+      Some("blog"),
+      Some(7),
+      Some("giolt_env"),
+      None,
+      Ok(Lookup("blog", env_client)),
+    ),
+    // A linked id needs no lookup, and a deploy key may deploy it too.
+    #(
+      None,
+      Some(7),
+      Some("giolt_env"),
+      None,
+      Ok(Ready(ToProject(7, env_client))),
+    ),
+    #(None, Some(7), None, Some(stored), Ok(Ready(ToProject(7, stored_client)))),
+    #(
+      None,
+      Some(7),
+      Some(deploy_key),
+      None,
+      Ok(Ready(ToProject(7, key_client))),
+    ),
+    #(
+      None,
+      Some(7),
+      Some(deploy_key),
+      Some(stored),
+      Ok(Ready(ToProject(7, key_client))),
+    ),
+    // Without a target, a deploy key keeps today's route.
+    #(None, None, Some(deploy_key), None, Ok(Ready(WithDeployKey(key_client)))),
+    #(
+      None,
+      None,
+      Some(deploy_key),
+      Some(stored),
+      Ok(Ready(WithDeployKey(key_client))),
+    ),
+    #(None, None, Some("giolt_env"), None, Error(NoProject)),
+    #(None, None, None, Some(stored), Error(NoProject)),
+    #(None, None, None, None, Error(MissingToken)),
+    #(None, Some(7), None, None, Error(MissingToken)),
+    #(None, None, Some(""), None, Error(MissingToken)),
+  ]
 
-  let config =
-    deploy.new()
-    |> deploy.artifact("./dist")
-
-  envie.set("GIOLT_TOKEN", "secret")
-
-  assert deploy.plan(config)
-    == Ok(deploy.Plan(
-      artifact_dir: "./dist",
-      assets_only: False,
-      preview: False,
-      spa: False,
-      token: "secret",
-      api_url: "https://dash.giolt.com",
-    ))
+  list.each(rows, fn(row) {
+    let #(project, linked, env_token, stored, expected) = row
+    assert route(project, linked, env_token, stored) == expected
+  })
 }
 
-pub fn plan_uses_explicit_token_test() {
-  envie.unset("GIOLT_API_URL")
+pub fn giolt_token_goes_to_giolt_api_url_then_config_then_default_test() {
+  let route = fn(env_api_url, config_api_url) {
+    deploy.route(
+      project: None,
+      linked: Some(7),
+      env_token: Some("giolt_env"),
+      env_api_url:,
+      config_api_url:,
+      stored: None,
+    )
+  }
+  let to = fn(api_url) {
+    Ok(Ready(ToProject(7, Client(api_url:, token: "giolt_env"))))
+  }
 
-  let config =
-    deploy.new()
-    |> deploy.artifact("./dist")
-    |> deploy.token("explicit-token")
-
-  assert deploy.plan(config)
-    == Ok(deploy.Plan(
-      artifact_dir: "./dist",
-      assets_only: False,
-      preview: False,
-      spa: False,
-      token: "explicit-token",
-      api_url: "https://dash.giolt.com",
-    ))
+  assert route(Some("http://env"), "https://config.example") == to("http://env")
+  assert route(None, "https://config.example") == to("https://config.example")
+  assert route(Some(""), "https://config.example")
+    == to("https://config.example")
+  assert route(None, config.default_api_url) == to("https://dash.giolt.com")
 }
 
-pub fn plan_custom_token_env_var_test() {
-  let config =
-    deploy.new()
-    |> deploy.artifact("./dist")
-    |> deploy.token_from_env("CUSTOM_TOKEN")
-
-  assert deploy.plan(config) == Error(deploy.MissingToken("CUSTOM_TOKEN"))
-
-  envie.set("CUSTOM_TOKEN", "abc")
-  let assert Ok(plan) = deploy.plan(config)
-  assert plan.token == "abc"
+pub fn a_stored_login_only_goes_to_the_server_that_issued_it_test() {
+  assert deploy.route(
+      project: None,
+      linked: Some(7),
+      env_token: None,
+      env_api_url: Some("http://env"),
+      config_api_url: "https://config.example",
+      stored: Some(stored),
+    )
+    == Ok(Ready(ToProject(7, stored_client)))
 }
 
-pub fn plan_carries_preview_flag_test() {
+pub fn plan_carries_the_artifact_and_flags_test() {
   let config =
     deploy.new()
     |> deploy.artifact("./dist")
     |> deploy.preview(True)
 
-  envie.set("GIOLT_TOKEN", "secret")
-  let assert Ok(plan) = deploy.plan(config)
-
-  assert plan.preview == True
-}
-
-pub fn plan_carries_custom_api_url_test() {
-  envie.unset("GIOLT_API_URL")
-
-  let config =
-    deploy.new()
-    |> deploy.artifact("./dist")
-    |> deploy.api_url("https://staging.giolt.com")
-
-  envie.set("GIOLT_TOKEN", "secret")
-  let assert Ok(plan) = deploy.plan(config)
-
-  assert plan.api_url == "https://staging.giolt.com"
-}
-
-pub fn plan_api_url_env_overrides_configured_url_test() {
-  let config =
-    deploy.new()
-    |> deploy.artifact("./dist")
-    |> deploy.api_url("https://staging.giolt.com")
-
-  envie.set("GIOLT_TOKEN", "secret")
-  envie.set("GIOLT_API_URL", "http://localhost:8787")
-  let assert Ok(plan) = deploy.plan(config)
-
-  assert plan.api_url == "http://localhost:8787"
+  assert deploy.plan(config)
+    == deploy.Plan(
+      artifact_dir: "./dist",
+      assets_only: False,
+      preview: True,
+      spa: False,
+    )
 }
 
 pub fn plan_from_bundle_output_uses_its_outdir_test() {
@@ -130,16 +177,37 @@ pub fn plan_from_bundle_output_uses_its_outdir_test() {
     deploy.new()
     |> deploy.from(output)
 
-  envie.set("GIOLT_TOKEN", "secret")
-  let assert Ok(plan) = deploy.plan(config)
+  let plan = deploy.plan(config)
 
   assert plan.artifact_dir == "./build-output"
 }
 
 pub fn describe_error_missing_token_test() {
-  let message = deploy.describe_error(deploy.MissingToken("GIOLT_TOKEN"))
+  let message = deploy.describe_error(MissingToken)
 
+  assert string.contains(message, "giolt login")
   assert string.contains(message, "GIOLT_TOKEN")
+}
+
+pub fn describe_error_no_project_test() {
+  assert deploy.describe_error(NoProject)
+    == "No project to deploy to. Run `giolt link <name>` or pass `--project <name>`."
+}
+
+pub fn describe_error_name_needs_user_token_test() {
+  let message = deploy.describe_error(NameNeedsUserToken("blog"))
+
+  assert string.contains(message, "`blog`")
+  assert string.contains(message, "giolt link")
+}
+
+pub fn describe_error_prints_the_api_message_test() {
+  let message = "Add a payment method at https://dash.giolt.com/billing."
+
+  assert deploy.describe_error(
+      deploy.Api(api.Rejected(code: api.BillingRequired, message:)),
+    )
+    == message
 }
 
 pub fn describe_error_artifact_not_found_test() {
@@ -179,27 +247,21 @@ pub fn artifact_files_splits_modules_from_static_assets_test() {
 }
 
 pub fn plan_carries_spa_flag_test() {
-  envie.unset("GIOLT_API_URL")
-
   let config =
     deploy.new()
     |> deploy.artifact("./dist")
-    |> deploy.token("explicit-token")
     |> deploy.spa(True)
 
-  let assert Ok(plan) = deploy.plan(config)
+  let plan = deploy.plan(config)
   assert plan.spa
 }
 
 pub fn plan_for_an_assets_only_site_test() {
-  envie.unset("GIOLT_API_URL")
-
   let config =
     deploy.new()
     |> deploy.assets("./site")
-    |> deploy.token("explicit-token")
 
-  let assert Ok(plan) = deploy.plan(config)
+  let plan = deploy.plan(config)
 
   assert plan.artifact_dir == "./site"
   assert plan.assets_only

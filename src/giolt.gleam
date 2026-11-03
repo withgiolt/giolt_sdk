@@ -31,8 +31,10 @@ fn run(command: cli.Command) -> Promise(Result(Nil, String)) {
   case command {
     cli.Build(config:) -> commands.build(config:)
     cli.Dev(config:) -> commands.dev(config:)
-    cli.Deploy(preview:, artifact:, config:) ->
-      commands.deploy(preview:, artifact:, config:)
+    cli.Deploy(preview:, artifact:, project:, config:) ->
+      commands.deploy(preview:, artifact:, project:, config:)
+    cli.Link(name:, config:) -> commands.link_project(name:, config:)
+    cli.Unlink(config:) -> commands.unlink_project(config:)
     cli.Login(token:) -> commands.login(token:)
     cli.Logout -> commands.logout()
     cli.Whoami -> commands.whoami()

@@ -10,7 +10,14 @@ import gleam/string
 pub type Command {
   Build(config: Option(String))
   Dev(config: Option(String))
-  Deploy(preview: Bool, artifact: Option(String), config: Option(String))
+  Deploy(
+    preview: Bool,
+    artifact: Option(String),
+    project: Option(String),
+    config: Option(String),
+  )
+  Link(name: String, config: Option(String))
+  Unlink(config: Option(String))
   Login(token: Option(String))
   Logout
   Whoami
@@ -28,7 +35,8 @@ pub type Outcome {
 }
 
 const command_names = [
-  "build", "dev", "deploy", "login", "logout", "whoami", "projects", "usage",
+  "build", "dev", "deploy", "link", "unlink", "login", "logout", "whoami",
+  "projects", "usage",
 ]
 
 pub fn parse(args: List(String)) -> Outcome {
@@ -58,6 +66,8 @@ fn command() -> clip.Command(Command) {
     #("build", subcommand(Build, "build", "Bundle the app for deployment")),
     #("dev", subcommand(Dev, "dev", "Run the app locally with live reload")),
     #("deploy", deploy_command()),
+    #("link", link_command()),
+    #("unlink", subcommand(Unlink, "unlink", "Forget the linked project")),
     #("login", login_command()),
     #("logout", plain(Logout, "logout", "Revoke and remove the token")),
     #("whoami", plain(Whoami, "whoami", "Show who the token belongs to")),
@@ -70,12 +80,15 @@ fn command() -> clip.Command(Command) {
 fn deploy_command() -> clip.Command(Command) {
   clip.command(fn(preview) {
     fn(artifact) {
-      fn(config) {
-        Deploy(
-          preview:,
-          artifact: option.from_result(artifact),
-          config: option.from_result(config),
-        )
+      fn(project) {
+        fn(config) {
+          Deploy(
+            preview:,
+            artifact: option.from_result(artifact),
+            project: option.from_result(project),
+            config: option.from_result(config),
+          )
+        }
       }
     }
   })
@@ -87,8 +100,25 @@ fn deploy_command() -> clip.Command(Command) {
     |> opt.help("Deploy this directory as a static site, skipping the build")
     |> opt.optional,
   )
+  |> clip.opt(
+    opt.new("project")
+    |> opt.help("Deploy to this project instead of the linked one")
+    |> opt.optional,
+  )
   |> clip.opt(config_opt())
   |> clip.help(help.simple("giolt deploy", "Deploy the bundle to Giolt"))
+}
+
+fn link_command() -> clip.Command(Command) {
+  clip.command(fn(name) {
+    fn(config) { Link(name:, config: option.from_result(config)) }
+  })
+  |> clip.arg(arg.new("name") |> arg.help("The project to deploy to"))
+  |> clip.opt(config_opt())
+  |> clip.help(help.simple(
+    "giolt link",
+    "Remember a project in [tools.giolt] so deploy needs no flags",
+  ))
 }
 
 fn login_command() -> clip.Command(Command) {

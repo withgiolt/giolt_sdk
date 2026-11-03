@@ -4,6 +4,7 @@ import giolt/internal/api.{
   UnexpectedResponse, Unreachable, Usage,
 }
 import gleam/http
+import gleam/json
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
@@ -327,4 +328,22 @@ fn has_header(
   value: String,
 ) -> Bool {
   list.contains(headers, #(name, value))
+}
+
+pub fn a_deployment_posts_the_body_to_the_project_test() {
+  let body = json.object([#("preview", json.bool(False))])
+  let assert Ok(req) = api.create_deployment_request(client, 7, body)
+
+  assert req.method == http.Post
+  assert req.path == "/api/v1/projects/7/deployments"
+  assert req.body == "{\"preview\":false}"
+  assert req.headers |> has_header("authorization", "Bearer giolt_abc")
+}
+
+pub fn a_created_deployment_is_decoded_test() {
+  let body =
+    "{\"id\":\"v1\",\"url\":\"https://blog.giolt.app\",\"preview\":false}"
+
+  assert api.parse_json(201, body, api.deployed_decoder())
+    == Ok(api.Deployed(id: "v1", url: "https://blog.giolt.app", preview: False))
 }

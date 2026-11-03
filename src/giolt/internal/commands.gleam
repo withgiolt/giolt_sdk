@@ -10,6 +10,7 @@ import giolt/internal/credentials.{type Credential, type Session, Credential}
 import giolt/internal/deploy
 import giolt/internal/glowvm_bin
 import giolt/internal/io
+import giolt/internal/link
 import giolt/internal/process
 import giolt/internal/server
 import giolt/internal/signature
@@ -49,6 +50,7 @@ pub fn build(
 pub fn deploy(
   preview preview: Bool,
   artifact artifact: Option(String),
+  project project: Option(String),
   config config_path: Option(String),
 ) -> Promise(Result(Nil, String)) {
   case read_config(config_path, artifact) {
@@ -60,6 +62,7 @@ pub fn deploy(
             config,
             deploy.assets(deploy.new(), path),
             preview,
+            project,
             fn() { prepare_site(config, path) },
           )
         None, Erlang ->
@@ -71,6 +74,7 @@ pub fn deploy(
             config,
             deploy.artifact(deploy.new(), config.outdir),
             preview,
+            project,
             fn() { run_build(config) },
           )
       }
@@ -81,25 +85,109 @@ fn build_then_submit(
   config: Config,
   artifact: deploy.Config(deploy.HasArtifact),
   preview: Bool,
+  project: Option(String),
   build: fn() -> Promise(Result(Nil, String)),
 ) -> Promise(Result(Nil, String)) {
   let configured =
     artifact
     |> deploy.preview(preview)
     |> deploy.spa(config.spa)
-    |> deploy.api_url(config.api_url)
 
-  // A missing token is knowable up front; don't make the user wait for a build.
-  case deploy.plan(configured) {
+  // A missing token or unknown project is knowable up front; don't make the
+  // user wait for a build.
+  use destination <- promise.try_await(deploy_destination(config, project))
+  use built <- promise.await(build())
+  case built {
+    Error(message) -> promise.resolve(Error(message))
+    Ok(Nil) -> submit(configured, destination)
+  }
+}
+
+fn deploy_destination(
+  config: Config,
+  project: Option(String),
+) -> Promise(Result(deploy.Destination, String)) {
+  let route =
+    deploy.route(
+      project:,
+      linked: config.project,
+      env_token: env_var(credentials.token_env),
+      env_api_url: env_var(credentials.api_url_env),
+      config_api_url: config.api_url,
+      stored: credentials.load(credentials_path()) |> result.unwrap(None),
+    )
+
+  case route {
     Error(error) -> promise.resolve(Error(deploy.describe_error(error)))
-    Ok(_) -> {
-      use built <- promise.await(build())
-      case built {
-        Error(message) -> promise.resolve(Error(message))
-        Ok(Nil) -> submit(configured)
-      }
+    Ok(deploy.Ready(destination)) -> promise.resolve(Ok(destination))
+    Ok(deploy.Lookup(name:, client:)) -> {
+      use found <- promise.map(api_call(api.find_project(client, name)))
+      use found <- result.map(found)
+      deploy.ToProject(id: found.id, client:)
     }
   }
+}
+
+pub fn link_project(
+  name name: String,
+  config config_path: Option(String),
+) -> Promise(Result(Nil, String)) {
+  let path = option.unwrap(config_path, "gleam.toml")
+  case simplifile.read(path) {
+    Error(_) -> promise.resolve(Error("Could not read " <> path <> "."))
+    Ok(source) -> {
+      use _, client <- signed_in()
+      use project <- promise.map(api_call(api.find_project(client, name)))
+      use project <- result.try(project)
+      use edited <- result.try(
+        link.set_project(source, project.id)
+        |> result.replace_error(cannot_edit(path)),
+      )
+      use _ <- result.map(write_config(path, edited))
+      io.println_success(
+        "Linked to "
+        <> project.slug
+        <> " (project "
+        <> int.to_string(project.id)
+        <> ") in "
+        <> path
+        <> ". Commit it so CI deploys there too.",
+      )
+    }
+  }
+}
+
+pub fn unlink_project(
+  config config_path: Option(String),
+) -> Promise(Result(Nil, String)) {
+  let path = option.unwrap(config_path, "gleam.toml")
+  promise.resolve({
+    use source <- result.try(
+      simplifile.read(path)
+      |> result.replace_error("Could not read " <> path <> "."),
+    )
+    use edited <- result.try(
+      link.remove_project(source) |> result.replace_error(cannot_edit(path)),
+    )
+    case edited == source {
+      True -> Ok(io.println_info("No project is linked in " <> path <> "."))
+      False -> {
+        use _ <- result.map(write_config(path, edited))
+        io.println_success("Removed the linked project from " <> path <> ".")
+      }
+    }
+  })
+}
+
+fn cannot_edit(path: String) -> String {
+  "Could not edit `project` in "
+  <> path
+  <> ". Set `project` under [tools.giolt] by hand."
+}
+
+fn write_config(path: String, text: String) -> Result(Nil, String) {
+  simplifile.write(path, text)
+  |> result.replace_error("Could not write " <> path <> ".")
 }
 
 pub fn dev(config config_path: Option(String)) -> Promise(Result(Nil, String)) {
@@ -321,8 +409,9 @@ fn warn_unused_assets(config: Config) -> Nil {
 
 fn submit(
   configured: deploy.Config(deploy.HasArtifact),
+  destination: deploy.Destination,
 ) -> Promise(Result(Nil, String)) {
-  use result <- promise.map(deploy.run(configured))
+  use result <- promise.map(deploy.run(configured, destination))
   case result {
     Ok(deployment) -> {
       deploy.print_result(Ok(deployment))
