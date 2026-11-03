@@ -159,6 +159,14 @@ only reads, writes and calls it.
 Keep the `// Modified from Enderchief/esgleam...` attribution line at the top
 of files taken from there.
 
+## npm package
+
+`just build-npm` bundles `npm/bin.mjs` (which calls the compiled `main`) into
+`dist/giolt.mjs` and writes `dist/package.json` from `npm/package.json` with
+the version in `gleam.toml`. Publish `./dist`. `esgleam/streaming_tar.mjs`
+ships beside the bundle because `ffi_esbuild.mjs` finds it through
+`import.meta.url`; move either and installing esbuild breaks under `npx`.
+
 ## FFI conventions
 
 All `.mjs` files live beside the Gleam module that declares their

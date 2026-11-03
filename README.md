@@ -11,6 +11,13 @@ gleam run -m giolt build
 gleam run --runtime bun -m giolt build
 ```
 
+To skip the dev dependency, run it from npm instead. You still need Gleam
+installed, and Erlang/OTP and rebar3 for the Erlang target:
+
+```sh
+npx giolt build
+```
+
 Your entry module exports one function named `handle`:
 
 ```gleam

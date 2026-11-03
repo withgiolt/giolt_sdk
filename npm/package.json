@@ -1,0 +1,22 @@
+{
+  "name": "giolt",
+  "version": "0.0.0",
+  "description": "Build, run and deploy Gleam apps on Giolt",
+  "license": "GPL-3.0-or-later AND Apache-2.0",
+  "homepage": "https://giolt.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/withgiolt/cli.git"
+  },
+  "bin": {
+    "giolt": "giolt.mjs"
+  },
+  "files": [
+    "giolt.mjs",
+    "esgleam",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
