@@ -160,18 +160,8 @@ pub fn run(config: Config(HasArtifact)) -> Promise(Result(Deployment, Error)) {
   }
 
   case plan_result {
-    Error(error) -> {
-      io.println_error(describe_error(error))
-      promise.resolve(Error(error))
-    }
-    Ok(plan) -> {
-      use result <- promise.map(submit(plan))
-      case result {
-        Ok(_) -> Nil
-        Error(error) -> io.println_error(describe_error(error))
-      }
-      result
-    }
+    Error(error) -> promise.resolve(Error(error))
+    Ok(plan) -> submit(plan)
   }
 }
 

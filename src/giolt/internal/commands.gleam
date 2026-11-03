@@ -42,31 +42,50 @@ pub fn deploy(
     Error(message) -> promise.resolve(Error(message))
     Ok(config) ->
       case option.or(artifact, config.artifact), config.target {
-        Some(path), _ -> {
-          use prepared <- promise.await(prepare_site(config, path))
-          case prepared {
-            Error(message) -> promise.resolve(Error(message))
-            Ok(Nil) ->
-              submit(config, deploy.new() |> deploy.assets(path), preview)
-          }
-        }
+        Some(path), _ ->
+          build_then_submit(
+            config,
+            deploy.assets(deploy.new(), path),
+            preview,
+            fn() { prepare_site(config, path) },
+          )
         None, Erlang ->
           promise.resolve(Error(
             "Deploying the Erlang target is not supported by the Giolt platform yet.",
           ))
-        None, Javascript -> {
-          use built <- promise.await(run_build(config))
-          case built {
-            Error(message) -> promise.resolve(Error(message))
-            Ok(Nil) ->
-              submit(
-                config,
-                deploy.new() |> deploy.artifact(config.outdir),
-                preview,
-              )
-          }
-        }
+        None, Javascript ->
+          build_then_submit(
+            config,
+            deploy.artifact(deploy.new(), config.outdir),
+            preview,
+            fn() { run_build(config) },
+          )
       }
+  }
+}
+
+fn build_then_submit(
+  config: Config,
+  artifact: deploy.Config(deploy.HasArtifact),
+  preview: Bool,
+  build: fn() -> Promise(Result(Nil, String)),
+) -> Promise(Result(Nil, String)) {
+  let configured =
+    artifact
+    |> deploy.preview(preview)
+    |> deploy.spa(config.spa)
+    |> deploy.api_url(config.api_url)
+
+  // A missing token is knowable up front; don't make the user wait for a build.
+  case deploy.plan(configured) {
+    Error(error) -> promise.resolve(Error(deploy.describe_error(error)))
+    Ok(_) -> {
+      use built <- promise.await(build())
+      case built {
+        Error(message) -> promise.resolve(Error(message))
+        Ok(Nil) -> submit(configured)
+      }
+    }
   }
 }
 
@@ -288,22 +307,14 @@ fn warn_unused_assets(config: Config) -> Nil {
 }
 
 fn submit(
-  config: Config,
-  artifact: deploy.Config(deploy.HasArtifact),
-  preview: Bool,
+  configured: deploy.Config(deploy.HasArtifact),
 ) -> Promise(Result(Nil, String)) {
-  let configured =
-    artifact
-    |> deploy.preview(preview)
-    |> deploy.spa(config.spa)
-    |> deploy.api_url(config.api_url)
-
   use result <- promise.map(deploy.run(configured))
   case result {
     Ok(deployment) -> {
       deploy.print_result(Ok(deployment))
       Ok(Nil)
     }
-    Error(_) -> Error("Deploy failed.")
+    Error(error) -> Error(deploy.describe_error(error))
   }
 }

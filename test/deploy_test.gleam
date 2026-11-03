@@ -2,6 +2,7 @@ import envie
 import giolt/internal/bundle
 import giolt/internal/deploy
 import gleam/bit_array
+import gleam/javascript/promise
 import gleam/list
 import gleam/option
 import gleam/string
@@ -15,6 +16,15 @@ pub fn plan_missing_token_test() {
     |> deploy.artifact("./dist")
 
   assert deploy.plan(config) == Error(deploy.MissingToken("GIOLT_TOKEN"))
+}
+
+pub fn run_without_token_fails_before_submitting_test() {
+  envie.unset("GIOLT_TOKEN")
+
+  use result <- promise.map(
+    deploy.new() |> deploy.artifact("./dist") |> deploy.run,
+  )
+  assert result == Error(deploy.MissingToken("GIOLT_TOKEN"))
 }
 
 pub fn plan_resolves_token_from_env_test() {
