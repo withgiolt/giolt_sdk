@@ -30,6 +30,7 @@ pub type Config {
 
 pub type Error {
   InvalidToml
+  InvalidSettingsToml
   MissingName
   UnknownTarget(String)
   InvalidEntry(String)
@@ -58,11 +59,22 @@ pub fn default(package: String, target: Target) -> Config {
 }
 
 pub fn parse(source: String) -> Result(Config, Error) {
-  use toml <- result.try(tom.parse(source) |> result.replace_error(InvalidToml))
+  parse_with(source, None)
+}
+
+pub fn parse_with(
+  source: String,
+  settings: Option(String),
+) -> Result(Config, Error) {
+  use root <- result.try(tom.parse(source) |> result.replace_error(InvalidToml))
+  use toml <- result.try(case settings {
+    None -> Ok(root)
+    Some(text) -> tom.parse(text) |> result.replace_error(InvalidSettingsToml)
+  })
   use package <- result.try(
-    tom.get_string(toml, ["name"]) |> result.replace_error(MissingName),
+    tom.get_string(root, ["name"]) |> result.replace_error(MissingName),
   )
-  use target <- result.try(read_target(toml))
+  use target <- result.try(read_target(root))
   let defaults = default(package, target)
 
   use entry <- result.try(read_entry(toml, defaults.entry))
@@ -236,9 +248,18 @@ pub fn compiled_entry(config: Config) -> String {
   "./build/dev/javascript/" <> config.package <> "/" <> config.entry <> ".mjs"
 }
 
+pub fn blames_settings_file(error: Error) -> Bool {
+  case error {
+    InvalidToml | MissingName | UnknownTarget(_) -> False
+    _ -> True
+  }
+}
+
 pub fn describe_error(error: Error) -> String {
   case error {
     InvalidToml -> "Could not parse gleam.toml: it is not valid TOML."
+    InvalidSettingsToml ->
+      "Could not parse the file given to --config: it is not valid TOML."
     MissingName -> "gleam.toml has no `name`."
     UnknownTarget(target) ->
       "Unknown target `"

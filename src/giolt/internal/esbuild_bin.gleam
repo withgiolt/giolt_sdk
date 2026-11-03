@@ -1,6 +1,7 @@
 import giolt/internal/esbuild
 import giolt/internal/esgleam/esgleam/mod/platform
 import giolt/internal/io
+import gleam/javascript/promise.{type Promise}
 import simplifile
 
 pub fn ensure_installed() -> Result(String, String) {
@@ -20,17 +21,17 @@ pub fn ensure_installed() -> Result(String, String) {
   }
 }
 
-pub fn run(exe: String, args: List(String)) -> Result(Nil, String) {
+pub fn run(exe: String, args: List(String)) -> Promise(Result(Nil, String)) {
   exec(exe, args)
 }
 
 @target(javascript)
 @external(javascript, "./ffi_esbuild.mjs", "exec")
-fn exec(command: String, args: List(String)) -> Result(Nil, String)
+fn exec(command: String, args: List(String)) -> Promise(Result(Nil, String))
 
 @target(erlang)
-fn exec(_command: String, _args: List(String)) -> Result(Nil, String) {
-  Error("Giolt only supports the `javascript` target.")
+fn exec(_command: String, _args: List(String)) -> Promise(Result(Nil, String)) {
+  promise.resolve(Error("Giolt only supports the `javascript` target."))
 }
 
 @target(javascript)

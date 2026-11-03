@@ -29,8 +29,9 @@ pub fn main() -> Promise(Nil) {
 
 fn run(command: cli.Command) -> Promise(Result(Nil, String)) {
   case command {
-    cli.Build -> promise.resolve(commands.build())
-    cli.Dev -> commands.dev()
-    cli.Deploy(preview:, artifact:) -> commands.deploy(preview:, artifact:)
+    cli.Build(config:) -> commands.build(config:)
+    cli.Dev(config:) -> commands.dev(config:)
+    cli.Deploy(preview:, artifact:, config:) ->
+      commands.deploy(preview:, artifact:, config:)
   }
 }

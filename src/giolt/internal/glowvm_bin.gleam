@@ -4,6 +4,7 @@ import giolt/internal/glowvm
 import giolt/internal/io
 import giolt/internal/process
 import giolt/internal/tooling
+import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/result
 import gleam/string
@@ -11,14 +12,20 @@ import simplifile
 
 pub const steps = 3
 
-pub fn build(config: Config, outdir: String) -> Result(Nil, String) {
-  use _ <- result.try(generate_package(config))
-  use _ <- result.try(pack())
-  io.println_progress(2, steps, "Packed app")
+pub fn build(config: Config, outdir: String) -> Promise(Result(Nil, String)) {
+  case generate_package(config) {
+    Error(message) -> promise.resolve(Error(message))
+    Ok(Nil) -> {
+      use packed <- promise.map(pack())
 
-  use _ <- result.try(copy_output(outdir))
-  io.println_progress(3, steps, "Copied runtime")
-  Ok(Nil)
+      use _ <- result.try(packed)
+      io.println_progress(2, steps, "Packed app")
+
+      use _ <- result.try(copy_output(outdir))
+      io.println_progress(3, steps, "Copied runtime")
+      Ok(Nil)
+    }
+  }
 }
 
 pub fn check_tooling() -> Result(Nil, String) {
@@ -58,7 +65,7 @@ fn generate_package(config: Config) -> Result(Nil, String) {
   })
 }
 
-fn pack() -> Result(Nil, String) {
+fn pack() -> Promise(Result(Nil, String)) {
   io.println_info("Packing the app for GlowVM...")
 
   let _ = simplifile.delete(filepath.join(glowvm.build_dir, glowvm.archive))

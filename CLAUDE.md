@@ -3,7 +3,7 @@
 The `giolt` CLI: builds, runs and deploys Gleam apps on the Giolt platform.
 Consumers run `gleam run -m giolt <command>` (`build`, `dev`, `deploy`) and
 configure it under `[tools.giolt]` in their own `gleam.toml`. The CLI itself
-is a JavaScript-target package run on Bun; it builds consumer projects for
+is a JavaScript-target package that runs on Node or Bun; it builds consumer projects for
 either target. It was `giolt_sdk` until 3.0.1, now retired on Hex.
 
 ## Settings
@@ -62,7 +62,7 @@ One file per kind of code that shows how this repo does it. Copy its shape when 
 | Rule | Enforced by |
 |---|---|
 | Formatting | `gleam format --check` in .github/workflows/test.yml |
-| Tests pass | `gleam test` in .github/workflows/test.yml |
+| Tests pass on Node and Bun | `gleam test --target javascript --runtime` matrix in .github/workflows/test.yml |
 
 ## Shape of the thing
 
@@ -134,9 +134,10 @@ only reads, writes and calls it.
   `GIOLT_API_URL` (overrides `api_url`) are read in `deploy.gleam`. No `.env`
   loading, no `PUBLIC_`/`PRIVATE_` inlining.
 - **No glob or ignore matching in `dev`.** `watch` takes directories.
-- **Bun is the supported runtime** (`gleam run --runtime bun`); Deno is not
-  supported. The GlowVM output ships only `app.avm`, `glowvm.wasm`, `index.js`
-  and `index.min.js`.
+- **Node 20+ and Bun are the supported runtimes** (`gleam run -m giolt` and
+  `gleam run --runtime bun -m giolt`); Deno is not supported. Node 20 is the
+  floor because `fs.watch` is only recursive on Linux from there. The GlowVM
+  output ships only `app.avm`, `glowvm.wasm`, `index.js` and `index.min.js`.
 - **Comments are minimal.** Almost no doc comments in `src/`. Let names and
   types carry the meaning; the few comments that exist are load-bearing.
 - **The runtime package `glowvm` is declared as a Hex range** in the generated
@@ -169,5 +170,5 @@ depends on this repo by path as a dev dependency; the GlowVM build also needs
 a local `glowvm` checkout until it is on Hex.
 
 CI (`.github/workflows/test.yml`) runs `gleam format --check src test` and
-`gleam test` on every push and PR, including feature branches. Keep it that
-way.
+`gleam test` on Node 20, Node 22 and Bun on every push and PR, including
+feature branches. Keep it that way, so "both runtimes work" stays checked.

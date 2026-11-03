@@ -1,36 +1,33 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { default as process } from "node:process";
 import { Ok, Error as GleamError } from "../../gleam.mjs";
 
+function finish(child, describe) {
+  return new Promise((resolve) => {
+    child.on("error", (error) => resolve(new GleamError(error.message)));
+    child.on("close", (status, signal) => {
+      resolve(
+        status === 0
+          ? new Ok(undefined)
+          : new GleamError(describe(status ?? `signal ${signal}`)),
+      );
+    });
+  });
+}
+
 export function run(directory, command, args) {
-  const result = spawnSync(command, args.toArray(), {
+  const child = spawn(command, args.toArray(), {
     cwd: directory,
     stdio: "inherit",
   });
 
-  if (result.error) {
-    return new GleamError(result.error.message);
-  }
-
-  if (result.status === 0) {
-    return new Ok(undefined);
-  }
-
-  return new GleamError(`${command} exited with status ${result.status}`);
+  return finish(child, (status) => `${command} exited with status ${status}`);
 }
 
 export function shell(command) {
-  const result = spawnSync(command, { cwd: ".", stdio: "inherit", shell: true });
+  const child = spawn(command, { cwd: ".", stdio: "inherit", shell: true });
 
-  if (result.error) {
-    return new GleamError(result.error.message);
-  }
-
-  if (result.status === 0) {
-    return new Ok(undefined);
-  }
-
-  return new GleamError(`\`${command}\` exited with status ${result.status}`);
+  return finish(child, (status) => `\`${command}\` exited with status ${status}`);
 }
 
 export function forever() {

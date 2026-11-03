@@ -7,9 +7,9 @@ import gleam/option.{type Option}
 import gleam/string
 
 pub type Command {
-  Build
-  Dev
-  Deploy(preview: Bool, artifact: Option(String))
+  Build(config: Option(String))
+  Dev(config: Option(String))
+  Deploy(preview: Bool, artifact: Option(String), config: Option(String))
 }
 
 pub type Outcome {
@@ -53,7 +53,15 @@ fn command() -> clip.Command(Command) {
 
 fn deploy_command() -> clip.Command(Command) {
   clip.command(fn(preview) {
-    fn(artifact) { Deploy(preview:, artifact: option.from_result(artifact)) }
+    fn(artifact) {
+      fn(config) {
+        Deploy(
+          preview:,
+          artifact: option.from_result(artifact),
+          config: option.from_result(config),
+        )
+      }
+    }
   })
   |> clip.flag(
     flag.new("preview") |> flag.help("Deploy as a preview, not to production"),
@@ -63,15 +71,23 @@ fn deploy_command() -> clip.Command(Command) {
     |> opt.help("Deploy this directory as a static site, skipping the build")
     |> opt.optional,
   )
+  |> clip.opt(config_opt())
   |> clip.help(help.simple("giolt deploy", "Deploy the bundle to Giolt"))
 }
 
+fn config_opt() -> opt.Opt(Result(String, Nil)) {
+  opt.new("config")
+  |> opt.help("Read [tools.giolt] from this TOML file instead of gleam.toml")
+  |> opt.optional
+}
+
 fn subcommand(
-  value: Command,
+  command: fn(Option(String)) -> Command,
   name: String,
   description: String,
 ) -> clip.Command(Command) {
-  clip.return(value)
+  clip.command(fn(config) { command(option.from_result(config)) })
+  |> clip.opt(config_opt())
   |> clip.help(help.simple("giolt " <> name, description))
 }
 

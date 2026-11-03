@@ -11,41 +11,50 @@ import giolt/internal/watcher
 import gleam/javascript/promise.{type Promise}
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/string
 import simplifile
 
 const javascript_steps = 3
 
 const interface_path = "./build/.giolt-interface.json"
 
-pub fn build() -> Result(Nil, String) {
-  use config <- result.try(read_config())
-
-  case config.artifact {
-    Some(path) -> prepare_site(config, path)
-    None -> run_build(config)
+pub fn build(
+  config config_path: Option(String),
+) -> Promise(Result(Nil, String)) {
+  case read_config(config_path) {
+    Error(message) -> promise.resolve(Error(message))
+    Ok(config) ->
+      case config.artifact {
+        Some(path) -> prepare_site(config, path)
+        None -> run_build(config)
+      }
   }
 }
 
 pub fn deploy(
   preview preview: Bool,
   artifact artifact: Option(String),
+  config config_path: Option(String),
 ) -> Promise(Result(Nil, String)) {
-  case read_config() {
+  case read_config(config_path) {
     Error(message) -> promise.resolve(Error(message))
     Ok(config) ->
       case option.or(artifact, config.artifact), config.target {
-        Some(path), _ ->
-          case prepare_site(config, path) {
+        Some(path), _ -> {
+          use prepared <- promise.await(prepare_site(config, path))
+          case prepared {
             Error(message) -> promise.resolve(Error(message))
             Ok(Nil) ->
               submit(config, deploy.new() |> deploy.assets(path), preview)
           }
+        }
         None, Erlang ->
           promise.resolve(Error(
             "Deploying the Erlang target is not supported by the Giolt platform yet.",
           ))
-        None, Javascript ->
-          case run_build(config) {
+        None, Javascript -> {
+          use built <- promise.await(run_build(config))
+          case built {
             Error(message) -> promise.resolve(Error(message))
             Ok(Nil) ->
               submit(
@@ -54,12 +63,13 @@ pub fn deploy(
                 preview,
               )
           }
+        }
       }
   }
 }
 
-pub fn dev() -> Promise(Result(Nil, String)) {
-  case read_config() {
+pub fn dev(config config_path: Option(String)) -> Promise(Result(Nil, String)) {
+  case read_config(config_path) {
     Error(message) -> promise.resolve(Error(message))
     Ok(config) ->
       case config.artifact, config.target {
@@ -83,11 +93,11 @@ fn serve_dev(
   static_dir: String,
   worker_path: String,
 ) -> Promise(Result(Nil, String)) {
-  rebuild(config)
+  use _ <- promise.await(rebuild(config))
 
   let stop_watching =
-    watcher.watch(config.watch, fn(path, _kind) {
-      io.println_info("Changed " <> path <> ", rebuilding")
+    watcher.watch(config.watch, fn(paths) {
+      io.println_info("Changed " <> string.join(paths, ", ") <> ", rebuilding")
       rebuild(config)
     })
 
@@ -106,20 +116,22 @@ fn serve_dev(
   process.forever() |> promise.map(fn(_) { Ok(Nil) })
 }
 
-fn rebuild(config: Config) -> Nil {
-  let result = case config.artifact {
+fn rebuild(config: Config) -> Promise(Nil) {
+  let building = case config.artifact {
     Some(path) -> prepare_site(config, path)
     None -> run_build(config)
   }
 
+  use result <- promise.map(building)
   case result {
     Ok(Nil) -> server.notify_reload()
     Error(message) -> io.println_error(message)
   }
 }
 
-fn prepare_site(config: Config, path: String) -> Result(Nil, String) {
-  use _ <- result.try(run_prebuild(config.prebuild))
+fn prepare_site(config: Config, path: String) -> Promise(Result(Nil, String)) {
+  use prebuilt <- promise.map(run_prebuild(config.prebuild))
+  use _ <- result.try(prebuilt)
 
   case simplifile.read_directory(path) {
     Ok([_, ..]) -> {
@@ -136,41 +148,68 @@ fn prepare_site(config: Config, path: String) -> Result(Nil, String) {
   }
 }
 
-fn read_config() -> Result(Config, String) {
+fn read_config(settings_path: Option(String)) -> Result(Config, String) {
   use source <- result.try(
     simplifile.read("gleam.toml")
     |> result.replace_error(
       "Could not read gleam.toml. Run this from the root of a Gleam project.",
     ),
   )
+  use settings <- result.try(case settings_path {
+    None -> Ok(None)
+    Some(path) ->
+      simplifile.read(path)
+      |> result.map(Some)
+      |> result.replace_error(
+        "Could not read the --config file " <> path <> ".",
+      )
+  })
 
-  config.parse(source) |> result.map_error(config.describe_error)
+  config.parse_with(source, settings)
+  |> result.map_error(fn(error) {
+    case settings_path {
+      Some(path) -> {
+        case config.blames_settings_file(error) {
+          True ->
+            config.describe_error(error) <> " The value is in " <> path <> "."
+          False -> config.describe_error(error)
+        }
+      }
+      None -> config.describe_error(error)
+    }
+  })
 }
 
-fn run_build(config: Config) -> Result(Nil, String) {
-  use _ <- result.try(case config.target {
+fn run_build(config: Config) -> Promise(Result(Nil, String)) {
+  let tooling = case config.target {
     Javascript -> Ok(Nil)
     Erlang -> glowvm_bin.check_tooling()
-  })
-  use _ <- result.try(run_prebuild(config.prebuild))
-  use _ <- result.try(check_handle(config))
+  }
 
-  case config.target {
-    Javascript -> {
-      io.println_progress(1, javascript_steps, "Checked handle")
-      bundle_javascript(config)
-    }
-    Erlang -> {
-      io.println_progress(1, glowvm_bin.steps, "Checked handle")
-      warn_unused_assets(config)
-      glowvm_bin.build(config, config.outdir)
+  case tooling {
+    Error(message) -> promise.resolve(Error(message))
+    Ok(Nil) -> {
+      use _ <- promise.try_await(run_prebuild(config.prebuild))
+      use _ <- promise.try_await(check_handle(config))
+
+      case config.target {
+        Javascript -> {
+          io.println_progress(1, javascript_steps, "Checked handle")
+          bundle_javascript(config)
+        }
+        Erlang -> {
+          io.println_progress(1, glowvm_bin.steps, "Checked handle")
+          warn_unused_assets(config)
+          glowvm_bin.build(config, config.outdir)
+        }
+      }
     }
   }
 }
 
-fn run_prebuild(prebuild: Option(String)) -> Result(Nil, String) {
+fn run_prebuild(prebuild: Option(String)) -> Promise(Result(Nil, String)) {
   case prebuild {
-    None -> Ok(Nil)
+    None -> promise.resolve(Ok(Nil))
     Some(command) -> {
       io.println_info("Running prebuild: " <> command)
       process.shell(command)
@@ -178,32 +217,37 @@ fn run_prebuild(prebuild: Option(String)) -> Result(Nil, String) {
   }
 }
 
-fn check_handle(config: Config) -> Result(Nil, String) {
+fn check_handle(config: Config) -> Promise(Result(Nil, String)) {
   io.println_info("Checking `handle` in " <> config.entry <> "...")
 
-  use _ <- result.try(
-    simplifile.create_directory_all("./build")
-    |> result.replace_error("Could not create the build directory."),
-  )
-  use _ <- result.try(
-    process.run("gleam", [
-      "export",
-      "package-interface",
-      "--out",
-      interface_path,
-    ]),
-  )
-  use interface <- result.try(
-    simplifile.read(interface_path)
-    |> result.replace_error("Could not read " <> interface_path <> "."),
-  )
+  case simplifile.create_directory_all("./build") {
+    Error(_) -> promise.resolve(Error("Could not create the build directory."))
+    Ok(Nil) -> {
+      use exported <- promise.map(
+        process.run("gleam", [
+          "export",
+          "package-interface",
+          "--out",
+          interface_path,
+        ]),
+      )
 
-  signature.check(interface, config.entry, config.target)
-  |> result.map_error(signature.describe_error)
+      use _ <- result.try(exported)
+      use interface <- result.try(
+        simplifile.read(interface_path)
+        |> result.replace_error("Could not read " <> interface_path <> "."),
+      )
+
+      signature.check(interface, config.entry, config.target)
+      |> result.map_error(signature.describe_error)
+    }
+  }
 }
 
-fn bundle_javascript(config: Config) -> Result(Nil, String) {
-  use _ <- result.try(process.run("gleam", ["build", "--target", "javascript"]))
+fn bundle_javascript(config: Config) -> Promise(Result(Nil, String)) {
+  use _ <- promise.try_await(
+    process.run("gleam", ["build", "--target", "javascript"]),
+  )
   io.println_progress(2, javascript_steps, "Compiled")
 
   let base =
@@ -216,8 +260,8 @@ fn bundle_javascript(config: Config) -> Result(Nil, String) {
     None -> base
   }
 
-  with_assets
-  |> bundle.run
+  use bundled <- promise.map(bundle.run(with_assets))
+  bundled
   |> result.replace_error("Build failed.")
   |> result.map(fn(_) { io.println_progress(3, javascript_steps, "Bundled") })
 }

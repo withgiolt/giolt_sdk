@@ -2,10 +2,12 @@
 
 Build, run and deploy Gleam apps on [Giolt](https://giolt.com).
 
-Add it as a dev dependency and run it with Bun:
+Add it as a dev dependency and run it. It works on Node 20 or newer, which is
+Gleam's default JavaScript runtime, and on Bun:
 
 ```sh
 gleam add --dev giolt
+gleam run -m giolt build
 gleam run --runtime bun -m giolt build
 ```
 
@@ -26,15 +28,18 @@ and fails with the expected and found types when it does not match.
 
 | Command | Does |
 | --- | --- |
-| `giolt build` | Checks `handle`, compiles and bundles into `outdir` |
-| `giolt dev` | Builds, watches `watch`, serves on `port` and reloads on change (JavaScript target) |
-| `giolt deploy [--preview] [--artifact DIR]` | Builds, then uploads `outdir` to Giolt (JavaScript target). With `artifact`, uploads that directory instead |
+| `giolt build [--config FILE]` | Checks `handle`, compiles and bundles into `outdir` |
+| `giolt dev [--config FILE]` | Builds, watches `watch`, serves on `port` and reloads on change (JavaScript target) |
+| `giolt deploy [--preview] [--artifact DIR] [--config FILE]` | Builds, then uploads `outdir` to Giolt (JavaScript target). With `artifact`, uploads that directory instead |
 
 `deploy` reads the token from `GIOLT_TOKEN`. `GIOLT_API_URL` overrides `api_url`.
 
 ## Configuration
 
-Everything is optional and lives under `[tools.giolt]` in your `gleam.toml`:
+Everything is optional and lives under `[tools.giolt]` in your `gleam.toml`, or
+in the TOML file you pass with `--config FILE` when one package needs several
+builds (the package `name` and `target` still come from `gleam.toml`, and keys
+the file leaves out take their defaults):
 
 | Key | Default | Meaning |
 | --- | --- | --- |

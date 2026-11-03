@@ -1,6 +1,9 @@
 import gleam/javascript/promise.{type Promise}
 
-pub fn run(command: String, args: List(String)) -> Result(Nil, String) {
+pub fn run(
+  command: String,
+  args: List(String),
+) -> Promise(Result(Nil, String)) {
   run_in(".", command, args)
 }
 
@@ -10,24 +13,24 @@ pub fn run_in(
   directory: String,
   command: String,
   args: List(String),
-) -> Result(Nil, String)
+) -> Promise(Result(Nil, String))
 
 @target(erlang)
 pub fn run_in(
   _directory: String,
   _command: String,
   _args: List(String),
-) -> Result(Nil, String) {
-  Error("Giolt only supports the `javascript` target.")
+) -> Promise(Result(Nil, String)) {
+  promise.resolve(Error("Giolt only supports the `javascript` target."))
 }
 
 @target(javascript)
 @external(javascript, "./ffi_process.mjs", "shell")
-pub fn shell(command: String) -> Result(Nil, String)
+pub fn shell(command: String) -> Promise(Result(Nil, String))
 
 @target(erlang)
-pub fn shell(_command: String) -> Result(Nil, String) {
-  Error("Giolt only supports the `javascript` target.")
+pub fn shell(_command: String) -> Promise(Result(Nil, String)) {
+  promise.resolve(Error("Giolt only supports the `javascript` target."))
 }
 
 @target(javascript)

@@ -199,3 +199,47 @@ pub fn port_outside_the_valid_range_is_rejected_test() {
   assert highest.port == 65_535
   assert lowest.port == 1
 }
+
+pub fn settings_file_replaces_tools_giolt_but_not_name_or_target_test() {
+  let source =
+    "name = \"my_app\"\ntarget = \"javascript\"\n\n[tools.giolt]\nentry = \"my_app/server\"\nport = 4000\n"
+  let settings =
+    "[tools.giolt]\nentry = \"my_app/admin\"\noutdir = \"./dist/admin\"\n"
+
+  assert config.parse_with(source, Some(settings))
+    == Ok(
+      config.Config(
+        ..config.default("my_app", Javascript),
+        entry: "my_app/admin",
+        outdir: "./dist/admin",
+      ),
+    )
+}
+
+pub fn settings_file_without_tools_giolt_means_all_defaults_test() {
+  let source =
+    "name = \"my_app\"\ntarget = \"javascript\"\n\n[tools.giolt]\nport = 4000\n"
+
+  assert config.parse_with(source, Some("# nothing here\n"))
+    == Ok(config.default("my_app", Javascript))
+}
+
+pub fn invalid_settings_file_is_reported_apart_from_gleam_toml_test() {
+  let source = "name = \"my_app\"\ntarget = \"javascript\"\n"
+
+  assert config.parse_with(source, Some("[tools.giolt\n"))
+    == Error(config.InvalidSettingsToml)
+}
+
+pub fn settings_file_values_are_checked_like_gleam_toml_test() {
+  let source = "name = \"my_app\"\ntarget = \"javascript\"\n"
+
+  assert config.parse_with(source, Some("[tools.giolt]\nport = 0\n"))
+    == Error(config.InvalidPort(0))
+}
+
+pub fn blames_settings_file_for_tools_giolt_errors_only_test() {
+  assert config.blames_settings_file(config.InvalidSettingsToml)
+  assert !config.blames_settings_file(config.InvalidToml)
+  assert !config.blames_settings_file(config.MissingName)
+}

@@ -3,6 +3,7 @@ import giolt/internal/esbuild
 import giolt/internal/esbuild_bin
 import giolt/internal/io
 import giolt/internal/shim
+import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -74,8 +75,8 @@ pub fn additional_args(
   Config(entry:, static_dir:, outdir:, additional_args: args)
 }
 
-pub fn run(config: Config(HasEntry)) -> Result(Output, Error) {
-  let result = pipeline(config)
+pub fn run(config: Config(HasEntry)) -> Promise(Result(Output, Error)) {
+  use result <- promise.map(pipeline(config))
 
   case result {
     Ok(output) -> io.println_success("Bundled to " <> output.outdir)
@@ -85,19 +86,32 @@ pub fn run(config: Config(HasEntry)) -> Result(Output, Error) {
   result
 }
 
-fn pipeline(config: Config(HasEntry)) -> Result(Output, Error) {
-  use _ <- result.try(check_entry(config.entry))
-  use _ <- result.try(check_outdir(config.outdir, config.entry))
-  use _ <- result.try(clear_outdir(config.outdir))
-  use _ <- result.try(write_shim(config.entry))
-  use _ <- result.try(run_esbuild(config.outdir, config.additional_args))
-  use _ <- result.try(copy_static(config.static_dir, config.outdir))
+fn pipeline(config: Config(HasEntry)) -> Promise(Result(Output, Error)) {
+  let prepared = {
+    use _ <- result.try(check_entry(config.entry))
+    use _ <- result.try(check_outdir(config.outdir, config.entry))
+    use _ <- result.try(clear_outdir(config.outdir))
+    write_shim(config.entry)
+  }
 
-  Ok(Output(
-    outdir: config.outdir,
-    entry: config.entry,
-    static_dir: config.static_dir,
-  ))
+  case prepared {
+    Error(error) -> promise.resolve(Error(error))
+    Ok(Nil) -> {
+      use bundled <- promise.map(run_esbuild(
+        config.outdir,
+        config.additional_args,
+      ))
+
+      use _ <- result.try(bundled)
+      use _ <- result.try(copy_static(config.static_dir, config.outdir))
+
+      Ok(Output(
+        outdir: config.outdir,
+        entry: config.entry,
+        static_dir: config.static_dir,
+      ))
+    }
+  }
 }
 
 fn check_entry(entry_path: String) -> Result(Nil, Error) {
@@ -171,22 +185,23 @@ fn resolve_absolute(path: String) -> String
 fn run_esbuild(
   outdir: String,
   additional_args: List(String),
-) -> Result(Nil, Error) {
+) -> Promise(Result(Nil, Error)) {
   io.println_info("Bundling...")
 
-  use exe <- result.try(
-    esbuild_bin.ensure_installed() |> result.map_error(EsbuildFailed),
-  )
+  case esbuild_bin.ensure_installed() {
+    Error(reason) -> promise.resolve(Error(EsbuildFailed(reason)))
+    Ok(exe) -> {
+      let plan =
+        esbuild.Plan(
+          entry: shim.path,
+          outfile: filepath.join(outdir, "index.mjs"),
+          additional_args:,
+        )
 
-  let plan =
-    esbuild.Plan(
-      entry: shim.path,
-      outfile: filepath.join(outdir, "index.mjs"),
-      additional_args:,
-    )
-
-  esbuild_bin.run(exe, esbuild.flags(plan))
-  |> result.map_error(EsbuildFailed)
+      use result <- promise.map(esbuild_bin.run(exe, esbuild.flags(plan)))
+      result.map_error(result, EsbuildFailed)
+    }
+  }
 }
 
 fn copy_static(

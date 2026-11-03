@@ -103,11 +103,18 @@ async function loadWorker(workerPath) {
   if (loadedWorker.version === reloadVersion) return loadedWorker.worker;
 
   const copy = join(dirname(workerPath), `.giolt-dev-${reloadVersion}.mjs`);
-  await copyFile(workerPath, copy);
   try {
+    await copyFile(workerPath, copy);
     const worker = (await import(pathToFileURL(copy).href)).default;
     loadedWorker = { version: reloadVersion, worker };
     return worker;
+  } catch (error) {
+    // A rebuild deletes the output directory before it writes the new bundle,
+    // so a request in that window keeps the last worker that loaded.
+    if (error.code === "ENOENT" && loadedWorker.worker) {
+      return loadedWorker.worker;
+    }
+    throw error;
   } finally {
     await rm(copy, { force: true });
   }
