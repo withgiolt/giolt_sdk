@@ -60,7 +60,7 @@ async function statFile(path) {
   }
 }
 
-async function serveStatic(staticDir, method, urlPath, res, spa) {
+async function serveStatic(staticDir, method, urlPath, res, spaFallback) {
   const cleanPath = normalize(urlPath.split("?")[0]).replace(
     /^(\.\.[/\\])+/,
     "",
@@ -72,7 +72,7 @@ async function serveStatic(staticDir, method, urlPath, res, spa) {
   if (!filePath && !isRoot && (method === "GET" || method === "HEAD")) {
     filePath = await statFile(join(staticDir, `${routePath}.html`));
   }
-  if (!filePath && (isRoot || (spa && (method === "GET" || method === "HEAD")))) {
+  if (!filePath && (isRoot || (spaFallback && (method === "GET" || method === "HEAD")))) {
     filePath = await statFile(join(staticDir, "index.html"));
   }
   if (!filePath) return false;
@@ -187,7 +187,7 @@ export function serve(port, staticDir, workerPath, liveReload, spa) {
 
       if (
         staticDir &&
-        (await serveStatic(staticDir, req.method ?? "GET", req.url ?? "/", res, spa))
+        (await serveStatic(staticDir, req.method ?? "GET", req.url ?? "/", res, spa && !workerPath))
       ) {
         return;
       }
