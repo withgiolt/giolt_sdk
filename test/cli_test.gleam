@@ -1,7 +1,9 @@
 import giolt/internal/cli.{
-  Build, CreateProject, DeleteProject, Deploy, Dev, Invalid, Link, ListProjects,
-  Login, Logout, RenameProject, Run, ShowUsage, Unlink, Usage, Whoami,
+  Build, CreateProject, DeleteProject, Deploy, Dev, Help, Invalid, Link,
+  ListProjects, Login, Logout, RenameProject, Run, ShowUsage, Unlink, Usage,
+  Whoami,
 }
+import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
 
@@ -196,4 +198,75 @@ pub fn usage_lists_the_account_commands_test() {
   assert string.contains(text, "whoami")
   assert string.contains(text, "projects")
   assert string.contains(text, "usage")
+}
+
+pub fn help_is_a_command_test() {
+  assert cli.parse(["help"]) == Run(Help)
+}
+
+pub fn help_takes_no_arguments_test() {
+  let assert Invalid(text) = cli.parse(["help", "build"])
+
+  assert string.contains(text, "build")
+}
+
+pub fn top_level_usage_starts_with_the_logo_and_tagline_test() {
+  let assert Usage(text) = cli.parse([])
+
+  assert string.starts_with(
+    text,
+    " ∧\n|G|  Giolt\n ∨   Build, run and deploy Gleam apps on Giolt\n\nUsage:",
+  )
+}
+
+pub fn top_level_usage_names_the_tagline_once_test() {
+  let assert Usage(text) = cli.parse(["--help"])
+
+  assert string.split(text, "Build, run and deploy") |> list.length == 2
+}
+
+pub fn top_level_usage_lists_help_test() {
+  let assert Usage(text) = cli.parse([])
+
+  assert string.contains(text, "\n  help")
+}
+
+pub fn top_level_usage_leaves_out_config_test() {
+  let assert Usage(text) = cli.parse([])
+
+  assert !string.contains(text, "config")
+}
+
+pub fn command_usage_lists_config_test() {
+  let assert Usage(build) = cli.parse(["build", "--help"])
+  let assert Usage(deploy) = cli.parse(["deploy", "--help"])
+
+  assert string.contains(build, "--config")
+  assert string.contains(deploy, "--config")
+}
+
+pub fn unknown_command_points_to_help_test() {
+  let assert Invalid(text) = cli.parse(["frobnicate"])
+
+  assert string.contains(text, "`giolt help`")
+}
+
+pub fn command_usage_has_no_logo_test() {
+  let assert Usage(text) = cli.parse(["build", "--help"])
+
+  assert !string.contains(text, "|G|")
+}
+
+pub fn top_level_usage_has_no_options_test() {
+  let assert Usage(text) = cli.parse([])
+
+  assert !string.contains(text, "--help")
+  assert !string.contains(text, "Options")
+  assert string.contains(text, "giolt <COMMAND>\n")
+}
+
+pub fn command_usage_still_lists_help_test() {
+  let assert Usage(text) = cli.parse(["build", "--help"])
+
+  assert string.contains(text, "--help")
 }

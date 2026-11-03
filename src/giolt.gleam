@@ -43,5 +43,6 @@ fn run(command: cli.Command) -> Promise(Result(Nil, String)) {
     cli.RenameProject(from:, to:) -> commands.rename_project(from:, to:)
     cli.DeleteProject(name:, yes:) -> commands.delete_project(name:, yes:)
     cli.ShowUsage(json:) -> commands.usage(json:)
+    cli.Help -> promise.resolve(Ok(stdio.println(cli.usage_text())))
   }
 }

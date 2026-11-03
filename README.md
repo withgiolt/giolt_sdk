@@ -11,13 +11,6 @@ gleam run -m giolt build
 gleam run --runtime bun -m giolt build
 ```
 
-To skip the dev dependency, run it from npm instead. You still need Gleam
-installed, and Erlang/OTP and rebar3 for the Erlang target:
-
-```sh
-npx giolt build
-```
-
 Your entry module exports one function named `handle`:
 
 ```gleam
@@ -40,6 +33,11 @@ and fails with the expected and found types when it does not match.
 | `giolt deploy [--preview] [--artifact DIR] [--project NAME] [--config FILE]` | Builds, then uploads `outdir` to Giolt (JavaScript target). With `artifact`, uploads that directory instead |
 | `giolt link NAME [--config FILE]` | Writes `project = <id>` under `[tools.giolt]`, so `deploy` needs no flags. Commit the file so CI deploys there too |
 | `giolt unlink [--config FILE]` | Removes that `project` line |
+| `giolt help` | Prints the commands. `giolt <command> --help` prints that command's flags |
+
+`gleam run -m giolt -h` prints help for `gleam run`, not for giolt, because
+Gleam reads the flag first. Use `gleam run -m giolt help` or `gleam run -m
+giolt` with no arguments instead.
 
 `link` and `unlink` edit the file as text, so comments and layout stay as they
 are. They write to the `--config` file when you pass one.

@@ -1,5 +1,6 @@
 import clip
 import clip/arg
+import clip/arg_info
 import clip/flag
 import clip/help
 import clip/opt
@@ -26,6 +27,7 @@ pub type Command {
   RenameProject(from: String, to: String)
   DeleteProject(name: String, yes: Bool)
   ShowUsage(json: Bool)
+  Help
 }
 
 pub type Outcome {
@@ -36,7 +38,7 @@ pub type Outcome {
 
 const command_names = [
   "build", "dev", "deploy", "link", "unlink", "login", "logout", "whoami",
-  "projects", "usage",
+  "projects", "usage", "help",
 ]
 
 pub fn parse(args: List(String)) -> Outcome {
@@ -73,8 +75,32 @@ fn command() -> clip.Command(Command) {
     #("whoami", plain(Whoami, "whoami", "Show who the token belongs to")),
     #("projects", projects_command()),
     #("usage", usage_command()),
+    #("help", plain(Help, "help", "Show this help")),
   ])
-  |> clip.help(help.simple("giolt", "Build, run and deploy Gleam apps on Giolt"))
+  |> clip.help(help.custom(top_level_help))
+}
+
+const logo =
+  " ∧
+|G|  Giolt
+ ∨   "
+
+const tagline = "Build, run and deploy Gleam apps on Giolt"
+
+// The logo carries the name and tagline, so clip's own header is dropped. The
+// only top-level option is --help, which `gleam run` swallows, so the options
+// section goes too and `giolt help` takes its place.
+fn top_level_help(info: arg_info.ArgInfo) -> String {
+  let text = arg_info.help_text(info, "giolt", tagline)
+  let usage = case string.split_once(text, "Usage:") {
+    Ok(#(_, rest)) -> "Usage:" <> rest
+    Error(Nil) -> text
+  }
+  let without_options = case string.split_once(usage, "\n\nOptions:") {
+    Ok(#(before, _)) -> string.replace(before, " [OPTIONS]", "")
+    Error(Nil) -> usage
+  }
+  logo <> tagline <> "\n\n" <> without_options
 }
 
 fn usage_command() -> clip.Command(Command) {
@@ -211,7 +237,7 @@ fn wants_usage(args: List(String)) -> Bool {
   list.contains(args, "--help") || list.contains(args, "-h")
 }
 
-fn usage_text() -> String {
+pub fn usage_text() -> String {
   case clip.run(command(), ["--help"]) {
     Ok(_) -> ""
     Error(text) -> text
@@ -223,7 +249,11 @@ fn invalid_message(args: List(String), clip_text: String) -> String {
     [first, ..] ->
       case list.contains(command_names, first) {
         True -> clip_text
-        False -> "Unknown command `" <> first <> "`.\n\n" <> usage_text()
+        False ->
+          "Unknown command `"
+          <> first
+          <> "`. Run `giolt help` to list the commands.\n\n"
+          <> usage_text()
       }
     [] -> usage_text()
   }
