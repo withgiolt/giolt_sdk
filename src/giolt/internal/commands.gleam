@@ -28,6 +28,11 @@ const javascript_steps = 3
 
 const interface_path = "./build/.giolt-interface.json"
 
+// A gleam.toml with no `target` is the Erlang target, which is what most
+// people hit here, so the way out is named.
+const target_hint =
+  " Set `target = \"javascript\"` in gleam.toml to use the JavaScript target."
+
 const login_expired =
   "The login code expired before it was approved. Run `giolt login` to get a new one."
 
@@ -67,7 +72,8 @@ pub fn deploy(
           )
         None, Erlang ->
           promise.resolve(Error(
-            "Deploying the Erlang target is not supported by the Giolt platform yet.",
+            "Deploying the Erlang target is not supported by the Giolt platform yet."
+            <> target_hint,
           ))
         None, Javascript ->
           build_then_submit(
@@ -198,7 +204,8 @@ pub fn dev(config config_path: Option(String)) -> Promise(Result(Nil, String)) {
         Some(path), _ -> serve_dev(config, path, "")
         None, Erlang ->
           promise.resolve(Error(
-            "`giolt dev` supports the javascript target only for now.",
+            "`giolt dev` supports the javascript target only for now."
+            <> target_hint,
           ))
         None, Javascript ->
           serve_dev(
