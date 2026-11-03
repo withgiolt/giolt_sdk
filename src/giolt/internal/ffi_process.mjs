@@ -40,8 +40,11 @@ export function available(command, args) {
   return !result.error && result.status === 0;
 }
 
+// Sets the exit code and lets the event loop drain. Calling process.exit()
+// while a fetch connection is still closing trips a libuv assertion on
+// Windows ("handle->flags & UV_HANDLE_CLOSING") that aborts with status 127.
 export function exit(code) {
-  process.exit(code);
+  process.exitCode = code;
 }
 
 export function is_interactive() {
