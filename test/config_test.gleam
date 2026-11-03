@@ -253,8 +253,7 @@ pub fn spa_without_artifact_is_rejected_test() {
 
   assert config.check_spa(spa, None) == Error(config.SpaWithoutArtifact)
   assert config.check_spa(spa, Some("dist")) == Ok(Nil)
-  assert config.check_spa(config.default("my_app", Javascript), None)
-    == Ok(Nil)
+  assert config.check_spa(config.default("my_app", Javascript), None) == Ok(Nil)
 }
 
 pub fn missing_artifact_mentions_prebuild_only_when_configured_test() {
