@@ -28,7 +28,7 @@ and fails with the expected and found types when it does not match.
 | --- | --- |
 | `giolt build` | Checks `handle`, compiles and bundles into `outdir` |
 | `giolt dev` | Builds, watches `watch`, serves on `port` and reloads on change (JavaScript target) |
-| `giolt deploy [--preview] [--message TEXT] [--artifact DIR]` | Builds, then uploads `outdir` to Giolt (JavaScript target). With `artifact`, uploads that directory instead |
+| `giolt deploy [--preview] [--artifact DIR]` | Builds, then uploads `outdir` to Giolt (JavaScript target). With `artifact`, uploads that directory instead |
 
 `deploy` reads the token from `GIOLT_TOKEN`. `GIOLT_API_URL` overrides `api_url`.
 

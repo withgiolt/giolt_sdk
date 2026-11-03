@@ -33,7 +33,6 @@ pub fn plan_resolves_token_from_env_test() {
       preview: False,
       spa: False,
       token: "secret",
-      message: option.None,
       api_url: "https://dash.giolt.com",
     ))
 }
@@ -53,7 +52,6 @@ pub fn plan_uses_explicit_token_test() {
       preview: False,
       spa: False,
       token: "explicit-token",
-      message: option.None,
       api_url: "https://dash.giolt.com",
     ))
 }
@@ -81,18 +79,6 @@ pub fn plan_carries_preview_flag_test() {
   let assert Ok(plan) = deploy.plan(config)
 
   assert plan.preview == True
-}
-
-pub fn plan_carries_message_test() {
-  let config =
-    deploy.new()
-    |> deploy.artifact("./dist")
-    |> deploy.message("release notes")
-
-  envie.set("GIOLT_TOKEN", "secret")
-  let assert Ok(plan) = deploy.plan(config)
-
-  assert plan.message == option.Some("release notes")
 }
 
 pub fn plan_carries_custom_api_url_test() {

@@ -28,7 +28,6 @@ pub fn build() -> Result(Nil, String) {
 
 pub fn deploy(
   preview preview: Bool,
-  message message: Option(String),
   artifact artifact: Option(String),
 ) -> Promise(Result(Nil, String)) {
   case read_config() {
@@ -39,12 +38,7 @@ pub fn deploy(
           case prepare_site(config, path) {
             Error(message) -> promise.resolve(Error(message))
             Ok(Nil) ->
-              submit(
-                config,
-                deploy.new() |> deploy.assets(path),
-                preview,
-                message,
-              )
+              submit(config, deploy.new() |> deploy.assets(path), preview)
           }
         None, Erlang ->
           promise.resolve(Error(
@@ -58,7 +52,6 @@ pub fn deploy(
                 config,
                 deploy.new() |> deploy.artifact(config.outdir),
                 preview,
-                message,
               )
           }
       }
@@ -242,19 +235,14 @@ fn submit(
   config: Config,
   artifact: deploy.Config(deploy.HasArtifact),
   preview: Bool,
-  message: Option(String),
 ) -> Promise(Result(Nil, String)) {
-  let base =
+  let configured =
     artifact
     |> deploy.preview(preview)
     |> deploy.spa(config.spa)
     |> deploy.api_url(config.api_url)
-  let with_message = case message {
-    Some(text) -> deploy.message(base, text)
-    None -> base
-  }
 
-  use result <- promise.map(deploy.run(with_message))
+  use result <- promise.map(deploy.run(configured))
   case result {
     Ok(deployment) -> {
       deploy.print_result(Ok(deployment))

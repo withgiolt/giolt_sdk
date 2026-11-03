@@ -36,7 +36,6 @@ pub opaque type Config(has_artifact) {
     preview: Bool,
     spa: Bool,
     token: TokenSource,
-    message: Option(String),
     api_url: String,
   )
 }
@@ -61,7 +60,6 @@ pub type Plan {
     preview: Bool,
     spa: Bool,
     token: String,
-    message: Option(String),
     api_url: String,
   )
 }
@@ -86,7 +84,6 @@ pub fn new() -> Config(NoArtifact) {
     preview: False,
     spa: False,
     token: FromEnv(default_token_env),
-    message: None,
     api_url: default_api_url,
   )
 }
@@ -116,8 +113,8 @@ fn set_artifact(
   config: Config(has_artifact),
   artifact: Artifact,
 ) -> Config(HasArtifact) {
-  let Config(preview:, spa:, token:, message:, api_url:, ..) = config
-  Config(artifact: Some(artifact), preview:, spa:, token:, message:, api_url:)
+  let Config(preview:, spa:, token:, api_url:, ..) = config
+  Config(artifact: Some(artifact), preview:, spa:, token:, api_url:)
 }
 
 pub fn preview(
@@ -146,13 +143,6 @@ pub fn token_from_env(
   var: String,
 ) -> Config(has_artifact) {
   Config(..config, token: FromEnv(var))
-}
-
-pub fn message(
-  config: Config(has_artifact),
-  text: String,
-) -> Config(has_artifact) {
-  Config(..config, message: Some(text))
 }
 
 pub fn api_url(
@@ -194,7 +184,6 @@ pub fn plan(config: Config(HasArtifact)) -> Result(Plan, Error) {
     preview: config.preview,
     spa: config.spa,
     token: token,
-    message: config.message,
     api_url: envie.get_string(api_url_env, config.api_url),
   ))
 }

@@ -5,8 +5,7 @@ import gleam/string
 pub fn each_command_is_recognised_test() {
   assert cli.parse(["build"]) == Run(Build)
   assert cli.parse(["dev"]) == Run(Dev)
-  assert cli.parse(["deploy"])
-    == Run(Deploy(preview: False, message: None, artifact: None))
+  assert cli.parse(["deploy"]) == Run(Deploy(preview: False, artifact: None))
 }
 
 pub fn no_arguments_shows_usage_test() {
@@ -46,38 +45,32 @@ pub fn extra_arguments_are_invalid_test() {
 
 pub fn deploy_flags_are_read_test() {
   assert cli.parse(["deploy", "--preview"])
-    == Run(Deploy(preview: True, message: None, artifact: None))
-  assert cli.parse(["deploy", "--message", "fix the header"])
-    == Run(Deploy(
-      preview: False,
-      message: Some("fix the header"),
-      artifact: None,
-    ))
-  assert cli.parse(["deploy", "--preview", "--message", "try it"])
-    == Run(Deploy(preview: True, message: Some("try it"), artifact: None))
+    == Run(Deploy(preview: True, artifact: None))
+  assert cli.parse(["deploy", "--artifact", "site"])
+    == Run(Deploy(preview: False, artifact: Some("site")))
 }
 
-pub fn deploy_message_without_a_value_is_invalid_test() {
-  let assert Invalid(text) = cli.parse(["deploy", "--message"])
+pub fn deploy_message_is_no_longer_a_flag_test() {
+  let assert Invalid(text) = cli.parse(["deploy", "--message", "x"])
 
   assert string.contains(text, "message")
 }
 
 pub fn deploy_flags_do_not_apply_to_other_commands_test() {
   let assert Invalid(_) = cli.parse(["build", "--preview"])
-  let assert Invalid(_) = cli.parse(["dev", "--message", "x"])
+  let assert Invalid(_) = cli.parse(["dev", "--artifact", "x"])
 }
 
 pub fn deploy_usage_lists_its_flags_test() {
   let assert Usage(text) = cli.parse(["deploy", "--help"])
 
   assert string.contains(text, "--preview")
-  assert string.contains(text, "--message")
+  assert string.contains(text, "--artifact")
 }
 
 pub fn deploy_artifact_flag_is_read_test() {
   assert cli.parse(["deploy", "--artifact", "./site"])
-    == Run(Deploy(preview: False, message: None, artifact: Some("./site")))
+    == Run(Deploy(preview: False, artifact: Some("./site")))
 }
 
 pub fn deploy_usage_lists_the_artifact_flag_test() {
