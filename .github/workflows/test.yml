@@ -7,6 +7,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [node20, node22, bun]
     steps:
       - uses: actions/checkout@v4
 
@@ -15,12 +19,20 @@ jobs:
           otp-version: "28"
           gleam-version: "1.19"
 
+      - uses: actions/setup-node@v4
+        if: startsWith(matrix.runtime, 'node')
+        with:
+          node-version: ${{ matrix.runtime == 'node20' && '20' || '22' }}
+
+      - uses: oven-sh/setup-bun@v2
+        if: matrix.runtime == 'bun'
+
       - name: Cache Gleam build
         uses: actions/cache@v4
         with:
           path: build
-          key: ${{ runner.os }}-gleam-build-${{ hashFiles('manifest.toml', 'gleam.toml') }}
-          restore-keys: ${{ runner.os }}-gleam-build-
+          key: ${{ runner.os }}-${{ matrix.runtime }}-gleam-build-${{ hashFiles('manifest.toml', 'gleam.toml') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.runtime }}-gleam-build-
 
       - name: Install dependencies
         run: gleam deps download
@@ -29,4 +41,4 @@ jobs:
         run: gleam format --check src test
 
       - name: Run tests
-        run: gleam test --target javascript
+        run: gleam test --target javascript --runtime ${{ startsWith(matrix.runtime, 'node') && 'nodejs' || 'bun' }}
