@@ -415,6 +415,12 @@ pub fn describe_error(error: Error) -> String {
 
     NotImplemented(detail) -> detail
 
+    // The deploy-key route answers a refused deploy with a plain-text message
+    // that already says what to change, such as the file-count or size limit,
+    // so it is shown as it is.
+    ApiError(status, body) if status == 400 || status == 402 || status == 413 ->
+      body
+
     ApiError(status, body) ->
       "Giolt API request failed with status "
       <> string.inspect(status)

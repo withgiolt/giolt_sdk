@@ -3,8 +3,8 @@ import giolt/internal/bundle
 import giolt/internal/config
 import giolt/internal/credentials.{type Credential, Credential}
 import giolt/internal/deploy.{
-  Lookup, MissingToken, NameNeedsUserToken, NoProject, Ready, ToProject,
-  WithDeployKey,
+  ApiError, Lookup, MissingToken, NameNeedsUserToken, NoProject, Ready,
+  ToProject, WithDeployKey,
 }
 import gleam/bit_array
 import gleam/list
@@ -180,6 +180,23 @@ pub fn plan_from_bundle_output_uses_its_outdir_test() {
   let plan = deploy.plan(config)
 
   assert plan.artifact_dir == "./build-output"
+}
+
+// The deploy-key route's refusals are plain text that already names the
+// limit, so they must not be wrapped in a status line.
+pub fn refused_deploys_show_the_server_message_test() {
+  assert deploy.describe_error(ApiError(
+      413,
+      "Too many files: a deploy can contain at most 5000 files",
+    ))
+    == "Too many files: a deploy can contain at most 5000 files"
+  assert deploy.describe_error(ApiError(400, "Nothing to deploy"))
+    == "Nothing to deploy"
+}
+
+pub fn other_api_failures_keep_their_status_test() {
+  assert deploy.describe_error(ApiError(502, "Deployment failed"))
+    == "Giolt API request failed with status 502: Deployment failed"
 }
 
 pub fn describe_error_missing_token_test() {
