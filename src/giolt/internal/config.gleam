@@ -262,7 +262,7 @@ pub fn describe_missing_artifact(
   let base = "No such artifact directory: " <> path <> "."
   case prebuild {
     Some(_) -> base <> " Make `prebuild` write the site there."
-    None -> base <> " It must exist before you build or deploy."
+    None -> base <> " Create it first."
   }
 }
 
@@ -272,7 +272,7 @@ pub fn compiled_entry(config: Config) -> String {
 
 pub fn blames_settings_file(error: Error) -> Bool {
   case error {
-    InvalidToml | MissingName | UnknownTarget(_) -> False
+    InvalidToml | MissingName | UnknownTarget(_) | SpaWithoutArtifact -> False
     _ -> True
   }
 }
@@ -298,7 +298,7 @@ pub fn describe_error(error: Error) -> String {
       <> "."
     SpaWithoutArtifact ->
       "`spa` only applies to static sites. Set `artifact` under [tools.giolt] "
-      <> "(or pass --artifact), or remove `spa`."
+      <> "(or pass --artifact to `giolt deploy`), or remove `spa`."
     InvalidValue(key:, expected:) ->
       "`" <> key <> "` must be " <> expected <> "."
   }

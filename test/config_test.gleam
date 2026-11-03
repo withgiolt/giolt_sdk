@@ -242,6 +242,7 @@ pub fn blames_settings_file_for_tools_giolt_errors_only_test() {
   assert config.blames_settings_file(config.InvalidSettingsToml)
   assert !config.blames_settings_file(config.InvalidToml)
   assert !config.blames_settings_file(config.MissingName)
+  assert !config.blames_settings_file(config.SpaWithoutArtifact)
 }
 
 pub fn spa_without_artifact_is_rejected_test() {
@@ -260,5 +261,5 @@ pub fn missing_artifact_mentions_prebuild_only_when_configured_test() {
   assert config.describe_missing_artifact("site", Some("make site"))
     == "No such artifact directory: site. Make `prebuild` write the site there."
   assert config.describe_missing_artifact("site", None)
-    == "No such artifact directory: site. It must exist before you build or deploy."
+    == "No such artifact directory: site. Create it first."
 }

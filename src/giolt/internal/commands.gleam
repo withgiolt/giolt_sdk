@@ -141,7 +141,13 @@ fn prepare_site(config: Config, path: String) -> Promise(Result(Nil, String)) {
       Ok(Nil)
     }
     Ok([]) -> Error("The artifact directory " <> path <> " is empty.")
-    Error(_) -> Error(describe_missing_artifact(path, config.prebuild))
+    Error(_) -> {
+      let site_prebuild = case config.artifact == Some(path) {
+        True -> config.prebuild
+        False -> None
+      }
+      Error(describe_missing_artifact(path, site_prebuild))
+    }
   }
 }
 
