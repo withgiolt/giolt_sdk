@@ -25,7 +25,7 @@ pub type Command {
   CreateProject(name: String)
   RenameProject(from: String, to: String)
   DeleteProject(name: String, yes: Bool)
-  ShowUsage
+  ShowUsage(json: Bool)
 }
 
 pub type Outcome {
@@ -72,9 +72,17 @@ fn command() -> clip.Command(Command) {
     #("logout", plain(Logout, "logout", "Revoke and remove the token")),
     #("whoami", plain(Whoami, "whoami", "Show who the token belongs to")),
     #("projects", projects_command()),
-    #("usage", plain(ShowUsage, "usage", "Show this billing period's usage")),
+    #("usage", usage_command()),
   ])
   |> clip.help(help.simple("giolt", "Build, run and deploy Gleam apps on Giolt"))
+}
+
+fn usage_command() -> clip.Command(Command) {
+  clip.command(fn(json) { ShowUsage(json:) })
+  |> clip.flag(
+    flag.new("json") |> flag.help("Print the usage as JSON, for scripts"),
+  )
+  |> clip.help(help.simple("giolt usage", "Show this billing period's usage"))
 }
 
 fn deploy_command() -> clip.Command(Command) {

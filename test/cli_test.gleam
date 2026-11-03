@@ -140,7 +140,8 @@ pub fn account_commands_are_recognised_test() {
   assert cli.parse(["login", "--token", "-"]) == Run(Login(token: Some("-")))
   assert cli.parse(["logout"]) == Run(Logout)
   assert cli.parse(["whoami"]) == Run(Whoami)
-  assert cli.parse(["usage"]) == Run(ShowUsage)
+  assert cli.parse(["usage"]) == Run(ShowUsage(json: False))
+  assert cli.parse(["usage", "--json"]) == Run(ShowUsage(json: True))
 }
 
 pub fn projects_subcommands_are_recognised_test() {

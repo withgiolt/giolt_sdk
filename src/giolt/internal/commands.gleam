@@ -727,15 +727,15 @@ fn ask_to_type(name: String) -> Promise(Bool) {
   confirm.accepts(expected: name, typed:)
 }
 
-pub fn usage() -> Promise(Result(Nil, String)) {
+pub fn usage(json json: Bool) -> Promise(Result(Nil, String)) {
   use _, client <- signed_in()
   use usage <- promise.map(api_call(api.usage(client)))
   use usage <- result.map(usage)
 
-  stdio.println("Requests: " <> int.to_string(usage.requests))
-  stdio.println(
-    "Period:   " <> usage.period_start <> " to " <> usage.period_end,
-  )
+  case json {
+    True -> stdio.println(api.usage_json(usage))
+    False -> list.each(api.describe_usage(usage), stdio.println)
+  }
 }
 
 fn signed_in(

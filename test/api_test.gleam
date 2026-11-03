@@ -124,15 +124,71 @@ pub fn me_is_decoded_with_a_nullable_expiry_test() {
 
 pub fn usage_is_decoded_test() {
   let body =
-    "{\"requests\":1234,\"period_start\":\"2026-11-01T00:00:00Z\","
+    "{\"requests\":1234,\"included\":1000000,"
+    <> "\"period_start\":\"2026-11-01T00:00:00Z\","
     <> "\"period_end\":\"2026-12-01T00:00:00Z\"}"
 
   assert api.parse_json(200, body, api.usage_decoder())
     == Ok(Usage(
       requests: 1234,
-      period_start: "2026-11-01T00:00:00Z",
-      period_end: "2026-12-01T00:00:00Z",
+      included: Some(1_000_000),
+      period_start: Some("2026-11-01T00:00:00Z"),
+      period_end: Some("2026-12-01T00:00:00Z"),
     ))
+}
+
+// An account with no billing customer: the API answers 0 with null dates.
+pub fn usage_without_a_period_is_decoded_test() {
+  let body =
+    "{\"requests\":0,\"included\":1000000,"
+    <> "\"period_start\":null,\"period_end\":null}"
+
+  assert api.parse_json(200, body, api.usage_decoder())
+    == Ok(Usage(
+      requests: 0,
+      included: Some(1_000_000),
+      period_start: None,
+      period_end: None,
+    ))
+}
+
+// A server from before `included` existed still works.
+pub fn usage_from_an_older_server_is_decoded_test() {
+  let body = "{\"requests\":5,\"period_start\":null,\"period_end\":null}"
+
+  let assert Ok(usage) = api.parse_json(200, body, api.usage_decoder())
+  assert usage.included == None
+}
+
+pub fn usage_is_described_test() {
+  let usage =
+    Usage(
+      requests: 1234,
+      included: Some(1_000_000),
+      period_start: Some("2026-11-01T00:00:00Z"),
+      period_end: Some("2026-12-01T00:00:00Z"),
+    )
+  assert api.describe_usage(usage)
+    == [
+      "Requests: 1234 of 1000000",
+      "Period:   2026-11-01T00:00:00Z to 2026-12-01T00:00:00Z",
+    ]
+  assert api.describe_usage(
+      Usage(..usage, included: None, period_start: None, period_end: None),
+    )
+    == ["Requests: 1234", "Period:   no billing period yet"]
+}
+
+pub fn usage_json_keeps_the_api_field_names_test() {
+  let usage =
+    Usage(
+      requests: 7,
+      included: Some(1_000_000),
+      period_start: None,
+      period_end: None,
+    )
+  assert api.usage_json(usage)
+    == "{\"requests\":7,\"included\":1000000,\"period_start\":null,\"period_end\":null}"
 }
 
 pub fn the_error_envelope_becomes_a_typed_code_test() {
