@@ -33,5 +33,13 @@ fn run(command: cli.Command) -> Promise(Result(Nil, String)) {
     cli.Dev(config:) -> commands.dev(config:)
     cli.Deploy(preview:, artifact:, config:) ->
       commands.deploy(preview:, artifact:, config:)
+    cli.Login(token:) -> commands.login(token:)
+    cli.Logout -> commands.logout()
+    cli.Whoami -> commands.whoami()
+    cli.ListProjects -> commands.list_projects()
+    cli.CreateProject(name:) -> commands.create_project(name:)
+    cli.RenameProject(from:, to:) -> commands.rename_project(from:, to:)
+    cli.DeleteProject(name:, yes:) -> commands.delete_project(name:, yes:)
+    cli.ShowUsage -> commands.usage()
   }
 }

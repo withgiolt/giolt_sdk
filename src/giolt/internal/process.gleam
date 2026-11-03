@@ -59,3 +59,39 @@ pub fn exit(code: Int) -> Nil
 pub fn exit(_code: Int) -> Nil {
   Nil
 }
+
+@target(javascript)
+@external(javascript, "./ffi_process.mjs", "is_interactive")
+pub fn is_interactive() -> Bool
+
+@target(erlang)
+pub fn is_interactive() -> Bool {
+  False
+}
+
+@target(javascript)
+@external(javascript, "./ffi_process.mjs", "read_line")
+pub fn read_line(prompt: String) -> Promise(String)
+
+@target(erlang)
+pub fn read_line(_prompt: String) -> Promise(String) {
+  promise.resolve("")
+}
+
+@target(javascript)
+@external(javascript, "./ffi_process.mjs", "sleep")
+pub fn sleep(milliseconds: Int) -> Promise(Nil)
+
+@target(erlang)
+pub fn sleep(_milliseconds: Int) -> Promise(Nil) {
+  promise.resolve(Nil)
+}
+
+@target(javascript)
+@external(javascript, "./ffi_process.mjs", "open_url")
+pub fn open_url(url: String) -> Nil
+
+@target(erlang)
+pub fn open_url(_url: String) -> Nil {
+  Nil
+}

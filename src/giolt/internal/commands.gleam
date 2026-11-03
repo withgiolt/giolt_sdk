@@ -1,8 +1,12 @@
+import envie
 import filepath
+import giolt/internal/api
 import giolt/internal/bundle
 import giolt/internal/config.{
   type Config, Erlang, Javascript, describe_missing_artifact,
 }
+import giolt/internal/confirm
+import giolt/internal/credentials.{type Credential, type Session, Credential}
 import giolt/internal/deploy
 import giolt/internal/glowvm_bin
 import giolt/internal/io
@@ -10,7 +14,10 @@ import giolt/internal/process
 import giolt/internal/server
 import giolt/internal/signature
 import giolt/internal/watcher
+import gleam/int
+import gleam/io as stdio
 import gleam/javascript/promise.{type Promise}
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
@@ -19,6 +26,12 @@ import simplifile
 const javascript_steps = 3
 
 const interface_path = "./build/.giolt-interface.json"
+
+const login_expired =
+  "The login code expired before it was approved. Run `giolt login` to get a new one."
+
+const env_token_untouched =
+  "`GIOLT_TOKEN` is set. Logging out only clears the stored token, so commands keep using GIOLT_TOKEN."
 
 pub fn build(
   config config_path: Option(String),
@@ -317,4 +330,369 @@ fn submit(
     }
     Error(error) -> Error(deploy.describe_error(error))
   }
+}
+
+pub fn login(token token: Option(String)) -> Promise(Result(Nil, String)) {
+  let api_url = credentials.api_url(env_var(credentials.api_url_env))
+  case token {
+    None -> login_in_browser(api_url)
+    Some("-") -> {
+      let prompt = case process.is_interactive() {
+        True -> "Paste the token: "
+        False -> ""
+      }
+      use line <- promise.await(process.read_line(prompt))
+      case string.trim(line) {
+        "" -> promise.resolve(Error("No token on stdin."))
+        token -> login_with_token(api_url, token)
+      }
+    }
+    Some(token) -> login_with_token(api_url, token)
+  }
+}
+
+fn login_with_token(
+  api_url: String,
+  token: String,
+) -> Promise(Result(Nil, String)) {
+  case credentials.token_kind(token) {
+    credentials.UserToken -> {
+      use previous <- promise.try_await(verify_and_store(api_url, token))
+      revoke_previous(previous, token)
+    }
+    credentials.DeployKey ->
+      promise.resolve(Error(
+        "That is a deploy key, which can only deploy its one project. "
+        <> "`giolt login --token` needs a user token, which starts with "
+        <> "`giolt_`. Deploy keys go in `GIOLT_TOKEN` for `giolt deploy`.",
+      ))
+  }
+}
+
+fn login_in_browser(api_url: String) -> Promise(Result(Nil, String)) {
+  use device <- promise.try_await(api_call(api.start_device_login(api_url)))
+
+  io.println_info("Your login code is " <> device.user_code)
+  io.println_info("Approve it at " <> device.verification_url)
+  case api.can_open_in_browser(device.verification_url) {
+    True -> process.open_url(device.verification_url)
+    False -> Nil
+  }
+  io.println_info("Waiting for approval...")
+
+  use token <- promise.try_await(await_approval(
+    api_url,
+    device.device_code,
+    device.interval,
+    device.expires_in,
+  ))
+  use stored <- promise.await(verify_and_store(api_url, token))
+  case stored {
+    Ok(previous) -> revoke_previous(previous, token)
+    // Nobody else holds this token, so don't leave it live on the server.
+    Error(message) -> {
+      let unsaved = api.Client(api_url:, token:)
+      use _ <- promise.map(api.revoke_token(unsaved))
+      Error(message)
+    }
+  }
+}
+
+fn await_approval(
+  api_url: String,
+  device_code: String,
+  interval: Int,
+  seconds_left: Int,
+) -> Promise(Result(String, String)) {
+  let interval = int.max(interval, 1)
+  case seconds_left <= 0 {
+    True -> promise.resolve(Error(login_expired))
+    False -> {
+      use _ <- promise.await(process.sleep(interval * 1000))
+      use step <- promise.await(api.poll_device_login(
+        api_url,
+        device_code,
+        interval,
+      ))
+      case step {
+        api.Approved(token) -> promise.resolve(Ok(token))
+        api.Pending(next) ->
+          await_approval(api_url, device_code, next, seconds_left - interval)
+        api.CodeExpired -> promise.resolve(Error(login_expired))
+        api.Denied ->
+          promise.resolve(Error(
+            "The login was denied in the browser. Run `giolt login` to try again.",
+          ))
+        api.PollFailed(error) ->
+          promise.resolve(Error(api.describe_error(error)))
+      }
+    }
+  }
+}
+
+fn verify_and_store(
+  api_url: String,
+  token: String,
+) -> Promise(Result(Option(Credential), String)) {
+  let path = credentials_path()
+  let previous = credentials.load(path) |> result.unwrap(None)
+  use me <- promise.map(api_call(api.me(api.Client(api_url:, token:))))
+  use me <- result.try(me)
+  use _ <- result.try(
+    credentials.save(path, Credential(token:, api_url:))
+    |> result.map_error(credentials.describe_error),
+  )
+
+  io.println_success("Logged in as " <> me.email <> ".")
+  io.println_info("Stored the token in " <> path <> ".")
+  warn_if_env_token("`GIOLT_TOKEN` is set and takes precedence over it.")
+  Ok(previous)
+}
+
+fn revoke_previous(
+  previous: Option(Credential),
+  token: String,
+) -> Promise(Result(Nil, String)) {
+  case previous {
+    Some(old) if old.token != token -> {
+      let replaced = api.Client(api_url: old.api_url, token: old.token)
+      use revoked <- promise.map(api.revoke_token(replaced))
+      case api.revocation(revoked) {
+        api.NotRevoked(warning) ->
+          io.println_warning("The previous login was replaced. " <> warning)
+        api.Revoked | api.AlreadyInvalid -> Nil
+      }
+      Ok(Nil)
+    }
+    _ -> promise.resolve(Ok(Nil))
+  }
+}
+
+pub fn logout() -> Promise(Result(Nil, String)) {
+  let path = credentials_path()
+  case credentials.load(path) {
+    Error(_) -> {
+      io.println_warning(
+        "The stored token is unreadable, so it was not revoked.",
+      )
+      promise.resolve(forget(path))
+    }
+    Ok(None) -> {
+      io.println_info("No stored token to remove.")
+      warn_if_env_token(env_token_untouched)
+      promise.resolve(Ok(Nil))
+    }
+    Ok(Some(stored)) -> {
+      let client = api.Client(api_url: stored.api_url, token: stored.token)
+      use revoked <- promise.map(api.revoke_token(client))
+      case api.revocation(revoked) {
+        api.Revoked -> io.println_success("Revoked the token.")
+        api.AlreadyInvalid -> Nil
+        api.NotRevoked(warning) -> io.println_warning(warning)
+      }
+      forget(path)
+    }
+  }
+}
+
+fn forget(path: String) -> Result(Nil, String) {
+  use _ <- result.map(
+    credentials.remove(path) |> result.map_error(credentials.describe_error),
+  )
+  io.println_success("Removed the stored token from " <> path <> ".")
+  warn_if_env_token(env_token_untouched)
+}
+
+pub fn whoami() -> Promise(Result(Nil, String)) {
+  use session, client <- signed_in()
+  use me <- promise.map(api_call(api.me(client)))
+  use me <- result.map(me)
+
+  let expiry = case me.expires_at {
+    Some(at) -> "expires " <> at
+    None -> "never expires"
+  }
+  let source = case session.source {
+    credentials.FromEnv -> credentials.token_env
+    credentials.FromFile -> credentials_path()
+  }
+  io.println_info("Logged in as " <> me.email)
+  stdio.println("Token:  " <> me.token_name <> " (" <> expiry <> ")")
+  stdio.println("Scopes: " <> string.join(me.scopes, ", "))
+  stdio.println("From:   " <> source)
+  case session.api_url == config.default_api_url {
+    True -> Nil
+    False -> stdio.println("API:    " <> session.api_url)
+  }
+}
+
+pub fn list_projects() -> Promise(Result(Nil, String)) {
+  use _, client <- signed_in()
+  use projects <- promise.map(api_call(api.list_projects(client)))
+  use projects <- result.map(projects)
+
+  case projects {
+    [] ->
+      io.println_info(
+        "No projects yet. Create one with `giolt projects create <name>`.",
+      )
+    _ -> list.each(project_lines(projects), stdio.println)
+  }
+}
+
+fn project_lines(projects: List(api.Project)) -> List(String) {
+  let widest = fn(field: fn(api.Project) -> String) {
+    list.fold(projects, 0, fn(width, project) {
+      int.max(width, string.length(field(project)))
+    })
+  }
+  let slug_width = widest(fn(project) { project.slug })
+  let url_width = widest(fn(project) { project.url })
+
+  list.map(projects, fn(project) {
+    string.pad_end(project.slug, slug_width, " ")
+    <> "  "
+    <> string.pad_end(project.url, url_width, " ")
+    <> "  "
+    <> deployment_status(project)
+  })
+}
+
+fn deployment_status(project: api.Project) -> String {
+  case project.suspended, project.latest_deployment {
+    True, _ -> "suspended"
+    False, Some(deployment) -> deployment.status
+    False, None -> "not deployed"
+  }
+}
+
+pub fn create_project(name name: String) -> Promise(Result(Nil, String)) {
+  use _, client <- signed_in()
+  use project <- promise.map(api_call(api.create_project(client, name)))
+  use project <- result.map(project)
+
+  io.println_success("Created " <> project.slug <> " at " <> project.url)
+}
+
+pub fn rename_project(
+  from from: String,
+  to to: String,
+) -> Promise(Result(Nil, String)) {
+  use _, client <- signed_in()
+  use old <- promise.try_await(api_call(api.find_project(client, from)))
+  use renamed <- promise.map(api_call(api.rename_project(client, old.id, to)))
+  use renamed <- result.map(renamed)
+
+  io.println_success(
+    "Renamed "
+    <> old.slug
+    <> " to "
+    <> renamed.slug
+    <> ", now at "
+    <> renamed.url,
+  )
+  io.println_warning(old.url <> " no longer serves it.")
+}
+
+pub fn delete_project(
+  name name: String,
+  yes yes: Bool,
+) -> Promise(Result(Nil, String)) {
+  case confirm.decide(yes:, interactive: process.is_interactive()) {
+    confirm.Refuse ->
+      promise.resolve(Error(
+        "Not deleting "
+        <> name
+        <> " without confirmation. Pass --yes to delete it from a script.",
+      ))
+    decision -> {
+      use _, client <- signed_in()
+      use project <- promise.try_await(api_call(api.find_project(client, name)))
+      use confirmed <- promise.await(case decision {
+        confirm.Ask -> ask_to_type(name)
+        _ -> promise.resolve(True)
+      })
+
+      case confirmed {
+        False ->
+          promise.resolve(Error(
+            "Not deleted: the name you typed did not match.",
+          ))
+        True -> {
+          let deleting = api_call(api.delete_project(client, project.id))
+          use deleted <- promise.map(deleting)
+          use _ <- result.map(deleted)
+          io.println_success("Deleted " <> project.slug <> ".")
+        }
+      }
+    }
+  }
+}
+
+fn ask_to_type(name: String) -> Promise(Bool) {
+  io.println_warning(
+    "This deletes " <> name <> " and all its deployments. It can't be undone.",
+  )
+  let prompt = "Type " <> name <> " to confirm: "
+  use typed <- promise.map(process.read_line(prompt))
+  confirm.accepts(expected: name, typed:)
+}
+
+pub fn usage() -> Promise(Result(Nil, String)) {
+  use _, client <- signed_in()
+  use usage <- promise.map(api_call(api.usage(client)))
+  use usage <- result.map(usage)
+
+  stdio.println("Requests: " <> int.to_string(usage.requests))
+  stdio.println(
+    "Period:   " <> usage.period_start <> " to " <> usage.period_end,
+  )
+}
+
+fn signed_in(
+  next: fn(Session, api.Client) -> Promise(Result(Nil, String)),
+) -> Promise(Result(Nil, String)) {
+  case open_session() {
+    Error(message) -> promise.resolve(Error(message))
+    Ok(session) ->
+      next(session, api.Client(api_url: session.api_url, token: session.token))
+  }
+}
+
+fn open_session() -> Result(Session, String) {
+  let stored = credentials.load(credentials_path())
+  let resolved =
+    credentials.resolve(
+      env_token: env_var(credentials.token_env),
+      env_api_url: env_var(credentials.api_url_env),
+      stored: result.unwrap(stored, None),
+    )
+
+  // An unreadable file only matters when there is no GIOLT_TOKEN to use.
+  case resolved, stored {
+    Ok(session), _ ->
+      credentials.require_user_token(session)
+      |> result.map_error(credentials.describe_error)
+    Error(_), Error(unreadable) -> Error(credentials.describe_error(unreadable))
+    Error(missing), Ok(_) -> Error(credentials.describe_error(missing))
+  }
+}
+
+fn credentials_path() -> String {
+  credentials.path(credentials.environment())
+}
+
+fn env_var(name: String) -> Option(String) {
+  envie.get(name) |> option.from_result
+}
+
+fn warn_if_env_token(message: String) -> Nil {
+  case env_var(credentials.token_env) {
+    Some("") | None -> Nil
+    Some(_) -> io.println_warning(message)
+  }
+}
+
+fn api_call(call: Promise(Result(a, api.Error))) -> Promise(Result(a, String)) {
+  promise.map(call, result.map_error(_, api.describe_error))
 }
