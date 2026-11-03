@@ -1,6 +1,8 @@
 import filepath
 import giolt/internal/bundle
-import giolt/internal/config.{type Config, Erlang, Javascript}
+import giolt/internal/config.{
+  type Config, Erlang, Javascript, describe_missing_artifact,
+}
 import giolt/internal/deploy
 import giolt/internal/glowvm_bin
 import giolt/internal/io
@@ -21,7 +23,7 @@ const interface_path = "./build/.giolt-interface.json"
 pub fn build(
   config config_path: Option(String),
 ) -> Promise(Result(Nil, String)) {
-  case read_config(config_path) {
+  case read_config(config_path, None) {
     Error(message) -> promise.resolve(Error(message))
     Ok(config) ->
       case config.artifact {
@@ -36,7 +38,7 @@ pub fn deploy(
   artifact artifact: Option(String),
   config config_path: Option(String),
 ) -> Promise(Result(Nil, String)) {
-  case read_config(config_path) {
+  case read_config(config_path, artifact) {
     Error(message) -> promise.resolve(Error(message))
     Ok(config) ->
       case option.or(artifact, config.artifact), config.target {
@@ -69,7 +71,7 @@ pub fn deploy(
 }
 
 pub fn dev(config config_path: Option(String)) -> Promise(Result(Nil, String)) {
-  case read_config(config_path) {
+  case read_config(config_path, None) {
     Error(message) -> promise.resolve(Error(message))
     Ok(config) ->
       case config.artifact, config.target {
@@ -139,16 +141,14 @@ fn prepare_site(config: Config, path: String) -> Promise(Result(Nil, String)) {
       Ok(Nil)
     }
     Ok([]) -> Error("The artifact directory " <> path <> " is empty.")
-    Error(_) ->
-      Error(
-        "No such artifact directory: "
-        <> path
-        <> ". Make `prebuild` write the site there.",
-      )
+    Error(_) -> Error(describe_missing_artifact(path, config.prebuild))
   }
 }
 
-fn read_config(settings_path: Option(String)) -> Result(Config, String) {
+fn read_config(
+  settings_path: Option(String),
+  artifact_flag: Option(String),
+) -> Result(Config, String) {
   use source <- result.try(
     simplifile.read("gleam.toml")
     |> result.replace_error(
@@ -166,6 +166,11 @@ fn read_config(settings_path: Option(String)) -> Result(Config, String) {
   })
 
   config.parse_with(source, settings)
+  |> result.try(fn(parsed) {
+    // The platform rejects spa with a worker, and dev would silently ignore it.
+    config.check_spa(parsed, option.or(artifact_flag, parsed.artifact))
+    |> result.replace(parsed)
+  })
   |> result.map_error(fn(error) {
     case settings_path {
       Some(path) -> {

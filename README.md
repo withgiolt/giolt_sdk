@@ -47,7 +47,7 @@ the file leaves out take their defaults):
 | `assets` | none | Directory of static files, copied to `outdir/static` and served by `dev` |
 | `outdir` | `"./dist"` | Where the bundle goes. It is deleted before every build |
 | `esbuild_args` | `[]` | Extra esbuild flags, appended after the fixed ones so they win |
-| `spa` | `false` | Serve `index.html` for paths that match no file (static-only apps) |
+| `spa` | `false` | Serve `index.html` for paths that match no file. Static-only apps: requires `artifact` (or `deploy --artifact`) |
 | `watch` | `["src"]`, plus `assets` | Directories `dev` watches |
 | `port` | `3000` | `dev` server port |
 | `live_reload` | `true` | Reload the browser after a rebuild |

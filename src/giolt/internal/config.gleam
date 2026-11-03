@@ -35,6 +35,7 @@ pub type Error {
   UnknownTarget(String)
   InvalidEntry(String)
   InvalidPort(Int)
+  SpaWithoutArtifact
   InvalidValue(key: String, expected: String)
 }
 
@@ -244,6 +245,27 @@ fn validate_module_name(name: String) -> Result(String, Error) {
   }
 }
 
+pub fn check_spa(
+  config: Config,
+  artifact: Option(String),
+) -> Result(Nil, Error) {
+  case config.spa, artifact {
+    True, None -> Error(SpaWithoutArtifact)
+    _, _ -> Ok(Nil)
+  }
+}
+
+pub fn describe_missing_artifact(
+  path: String,
+  prebuild: Option(String),
+) -> String {
+  let base = "No such artifact directory: " <> path <> "."
+  case prebuild {
+    Some(_) -> base <> " Make `prebuild` write the site there."
+    None -> base <> " It must exist before you build or deploy."
+  }
+}
+
 pub fn compiled_entry(config: Config) -> String {
   "./build/dev/javascript/" <> config.package <> "/" <> config.entry <> ".mjs"
 }
@@ -274,6 +296,9 @@ pub fn describe_error(error: Error) -> String {
       "`port` under [tools.giolt] must be between 1 and 65535, not "
       <> int.to_string(port)
       <> "."
+    SpaWithoutArtifact ->
+      "`spa` only applies to static sites. Set `artifact` under [tools.giolt] "
+      <> "(or pass --artifact), or remove `spa`."
     InvalidValue(key:, expected:) ->
       "`" <> key <> "` must be " <> expected <> "."
   }

@@ -243,3 +243,22 @@ pub fn blames_settings_file_for_tools_giolt_errors_only_test() {
   assert !config.blames_settings_file(config.InvalidToml)
   assert !config.blames_settings_file(config.MissingName)
 }
+
+pub fn spa_without_artifact_is_rejected_test() {
+  let assert Ok(spa) =
+    config.parse(
+      "name = \"my_app\"\ntarget = \"javascript\"\n[tools.giolt]\nspa = true\n",
+    )
+
+  assert config.check_spa(spa, None) == Error(config.SpaWithoutArtifact)
+  assert config.check_spa(spa, Some("dist")) == Ok(Nil)
+  assert config.check_spa(config.default("my_app", Javascript), None)
+    == Ok(Nil)
+}
+
+pub fn missing_artifact_mentions_prebuild_only_when_configured_test() {
+  assert config.describe_missing_artifact("site", Some("make site"))
+    == "No such artifact directory: site. Make `prebuild` write the site there."
+  assert config.describe_missing_artifact("site", None)
+    == "No such artifact directory: site. It must exist before you build or deploy."
+}
