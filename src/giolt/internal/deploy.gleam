@@ -3,11 +3,6 @@ import giolt/internal/bundle
 import giolt/internal/credentials.{type Credential}
 import giolt/internal/io
 import gleam/bit_array
-import gleam/dynamic/decode
-import gleam/fetch
-import gleam/http
-import gleam/http/request
-import gleam/http/response
 import gleam/javascript/promise.{type Promise}
 import gleam/json
 import gleam/list
@@ -31,8 +26,6 @@ pub opaque type Config(has_artifact) {
 }
 
 pub type Destination {
-  // POST /api/deploy, where the key itself names the project.
-  WithDeployKey(client: Client)
   ToProject(id: Int, client: Client)
 }
 
@@ -44,13 +37,11 @@ pub type Route {
 pub type Error {
   MissingToken
   NoProject
-  NameNeedsUserToken(name: String)
   Api(api.Error)
   ArtifactNotFound(path: String)
   ArtifactEmpty(path: String)
   CannotReadArtifact(path: String)
   NotImplemented(detail: String)
-  ApiError(status: Int, body: String)
 }
 
 pub type Plan {
@@ -110,9 +101,9 @@ pub fn spa(config: Config(has_artifact), is_spa: Bool) -> Config(has_artifact) {
   Config(..config, spa: is_spa)
 }
 
-// A user token in GIOLT_TOKEN goes to GIOLT_API_URL or the configured
-// `api_url`, like a deploy key always has. A stored login only goes to the
-// server that issued it.
+// GIOLT_TOKEN goes to GIOLT_API_URL or the configured `api_url`. A stored
+// login only goes to the server that issued it. GIOLT_TOKEN wins outright, so
+// a CI token is never swapped for a login stored on the same machine.
 pub fn route(
   project project: Option(String),
   linked linked: Option(Int),
@@ -121,33 +112,21 @@ pub fn route(
   config_api_url config_api_url: String,
   stored stored: Option(Credential),
 ) -> Result(Route, Error) {
-  let env_client = case non_empty(env_token) {
-    Some(token) -> {
+  let client = case non_empty(env_token), stored {
+    Some(token), _ -> {
       let api_url = non_empty(env_api_url) |> option.unwrap(config_api_url)
-      Some(#(credentials.token_kind(token), Client(api_url:, token:)))
+      Some(Client(api_url:, token:))
     }
-    None -> None
-  }
-  // GIOLT_TOKEN wins outright, so a CI deploy key is never swapped for a
-  // login stored on the same machine.
-  let #(user, deploy_key) = case env_client, stored {
-    Some(#(credentials.UserToken, client)), _ -> #(Some(client), None)
-    Some(#(credentials.DeployKey, client)), _ -> #(None, Some(client))
-    None, Some(credential) -> #(
-      Some(Client(api_url: credential.api_url, token: credential.token)),
-      None,
-    )
-    None, None -> #(None, None)
+    None, Some(credential) ->
+      Some(Client(api_url: credential.api_url, token: credential.token))
+    None, None -> None
   }
 
-  case project, linked, user, deploy_key {
-    Some(name), _, Some(client), _ -> Ok(Lookup(name:, client:))
-    Some(name), _, None, Some(_) -> Error(NameNeedsUserToken(name))
-    None, Some(id), Some(client), _ | None, Some(id), None, Some(client) ->
-      Ok(Ready(ToProject(id:, client:)))
-    None, None, _, Some(client) -> Ok(Ready(WithDeployKey(client)))
-    None, None, Some(_), None -> Error(NoProject)
-    _, _, None, None -> Error(MissingToken)
+  case client, project, linked {
+    None, _, _ -> Error(MissingToken)
+    Some(client), Some(name), _ -> Ok(Lookup(name:, client:))
+    Some(client), None, Some(id) -> Ok(Ready(ToProject(id:, client:)))
+    Some(_), None, None -> Error(NoProject)
   }
 }
 
@@ -239,12 +218,9 @@ fn submit(
     Error(error) -> promise.resolve(Error(error))
     Ok(#(modules, assets)) -> {
       let body = deploy_body(plan, modules, assets)
-      case destination {
-        WithDeployKey(client) -> post_with_deploy_key(client, body)
-        ToProject(id:, client:) ->
-          api.create_deployment(client, id, body)
-          |> promise.map(result.map_error(_, Api))
-      }
+      let ToProject(id:, client:) = destination
+      api.create_deployment(client, id, body)
+      |> promise.map(result.map_error(_, Api))
     }
   }
 }
@@ -252,7 +228,7 @@ fn submit(
 /// Reads every file under `dir`, splitting it into worker modules and static
 /// assets (files under `dir/static`). Each entry is `#(path, content_base64)`,
 /// with `path` relative to `dir` for modules and relative to `dir/static` for
-/// assets — matching what `/api/deploy` expects.
+/// assets — matching what the deployments endpoint expects.
 pub fn artifact_files(
   dir: String,
 ) -> Result(#(List(#(String, String)), List(#(String, String))), Error) {
@@ -318,32 +294,6 @@ fn deploy_body(
   ])
 }
 
-fn post_with_deploy_key(
-  client: Client,
-  body: json.Json,
-) -> Promise(Result(Deployed, Error)) {
-  case request.to(client.api_url <> "/api/deploy") {
-    Error(Nil) ->
-      promise.resolve(Error(ApiError(0, "Invalid api_url: " <> client.api_url)))
-    Ok(base_request) -> {
-      let req =
-        base_request
-        |> request.set_method(http.Post)
-        |> request.set_header("content-type", "application/json")
-        |> request.set_header("authorization", "Bearer " <> client.token)
-        |> request.set_body(json.to_string(body))
-
-      use send_result <- promise.await(fetch.send(req))
-
-      case send_result {
-        Error(fetch_error) ->
-          promise.resolve(Error(ApiError(0, string.inspect(fetch_error))))
-        Ok(res) -> handle_response(res)
-      }
-    }
-  }
-}
-
 fn file_json(file: #(String, String)) -> json.Json {
   let #(path, content_base64) = file
   json.object([
@@ -352,57 +302,15 @@ fn file_json(file: #(String, String)) -> json.Json {
   ])
 }
 
-fn handle_response(
-  res: response.Response(fetch.FetchBody),
-) -> Promise(Result(Deployed, Error)) {
-  case res.status {
-    200 -> {
-      use body_result <- promise.await(fetch.read_json_body(res))
-      case body_result {
-        Error(fetch_error) ->
-          promise.resolve(
-            Error(ApiError(res.status, string.inspect(fetch_error))),
-          )
-        Ok(json_res) ->
-          decode.run(json_res.body, api.deployed_decoder())
-          |> result.replace_error(ApiError(
-            res.status,
-            "Malformed response body",
-          ))
-          |> promise.resolve
-      }
-    }
-    status -> {
-      use body_result <- promise.await(fetch.read_text_body(res))
-      let body = case body_result {
-        Ok(text_res) -> text_res.body
-        Error(_) -> ""
-      }
-      promise.resolve(Error(ApiError(status, body)))
-    }
-  }
-}
-
 pub fn describe_error(error: Error) -> String {
   case error {
     MissingToken ->
       "No token found. Run `giolt login`, or set `"
       <> credentials.token_env
-      <> "` to a user token or the project's deploy key."
+      <> "` to a token from the dashboard's Tokens page."
 
     NoProject ->
       "No project to deploy to. Run `giolt link <name>` or pass `--project <name>`."
-
-    NameNeedsUserToken(name) ->
-      "Deploying to `"
-      <> name
-      <> "` by name needs a user token, but `"
-      <> credentials.token_env
-      <> "` holds a deploy key. Run `giolt link "
-      <> name
-      <> "` once with a user token so the project id is in gleam.toml, or set `"
-      <> credentials.token_env
-      <> "` to a user token."
 
     Api(error) -> api.describe_error(error)
 
@@ -414,18 +322,6 @@ pub fn describe_error(error: Error) -> String {
     CannotReadArtifact(path) -> "Could not read artifact file: " <> path
 
     NotImplemented(detail) -> detail
-
-    // The deploy-key route answers a refused deploy with a plain-text message
-    // that already says what to change, such as the file-count or size limit,
-    // so it is shown as it is.
-    ApiError(status, body) if status == 400 || status == 402 || status == 413 ->
-      body
-
-    ApiError(status, body) ->
-      "Giolt API request failed with status "
-      <> string.inspect(status)
-      <> ": "
-      <> body
   }
 }
 

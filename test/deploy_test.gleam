@@ -2,25 +2,18 @@ import giolt/internal/api.{Client}
 import giolt/internal/bundle
 import giolt/internal/config
 import giolt/internal/credentials.{type Credential, Credential}
-import giolt/internal/deploy.{
-  ApiError, Lookup, MissingToken, NameNeedsUserToken, NoProject, Ready,
-  ToProject, WithDeployKey,
-}
+import giolt/internal/deploy.{Lookup, MissingToken, NoProject, Ready, ToProject}
 import gleam/bit_array
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 import simplifile
 
-const deploy_key = "3f2a9c1e-0000-4000-8000-000000000000"
-
 const stored = Credential(token: "giolt_stored", api_url: "http://stored")
 
 const env_client = Client(api_url: "http://env", token: "giolt_env")
 
 const stored_client = Client(api_url: "http://stored", token: "giolt_stored")
-
-const key_client = Client(api_url: "http://env", token: deploy_key)
 
 fn route(
   project: Option(String),
@@ -40,30 +33,15 @@ fn route(
 
 pub fn the_target_and_credential_pick_the_route_test() {
   let rows = [
-    // --project names need a user token to resolve. GIOLT_TOKEN wins over a
-    // stored login, so a deploy key there can't resolve a name.
+    // GIOLT_TOKEN wins over a stored login.
     #(
       Some("blog"),
       None,
       Some("giolt_env"),
-      None,
+      Some(stored),
       Ok(Lookup("blog", env_client)),
     ),
     #(Some("blog"), None, None, Some(stored), Ok(Lookup("blog", stored_client))),
-    #(
-      Some("blog"),
-      None,
-      Some(deploy_key),
-      Some(stored),
-      Error(NameNeedsUserToken("blog")),
-    ),
-    #(
-      Some("blog"),
-      None,
-      Some(deploy_key),
-      None,
-      Error(NameNeedsUserToken("blog")),
-    ),
     #(
       Some("blog"),
       Some(7),
@@ -71,7 +49,7 @@ pub fn the_target_and_credential_pick_the_route_test() {
       None,
       Ok(Lookup("blog", env_client)),
     ),
-    // A linked id needs no lookup, and a deploy key may deploy it too.
+    // A linked id needs no lookup.
     #(
       None,
       Some(7),
@@ -80,29 +58,6 @@ pub fn the_target_and_credential_pick_the_route_test() {
       Ok(Ready(ToProject(7, env_client))),
     ),
     #(None, Some(7), None, Some(stored), Ok(Ready(ToProject(7, stored_client)))),
-    #(
-      None,
-      Some(7),
-      Some(deploy_key),
-      None,
-      Ok(Ready(ToProject(7, key_client))),
-    ),
-    #(
-      None,
-      Some(7),
-      Some(deploy_key),
-      Some(stored),
-      Ok(Ready(ToProject(7, key_client))),
-    ),
-    // Without a target, a deploy key keeps today's route.
-    #(None, None, Some(deploy_key), None, Ok(Ready(WithDeployKey(key_client)))),
-    #(
-      None,
-      None,
-      Some(deploy_key),
-      Some(stored),
-      Ok(Ready(WithDeployKey(key_client))),
-    ),
     #(None, None, Some("giolt_env"), None, Error(NoProject)),
     #(None, None, None, Some(stored), Error(NoProject)),
     #(None, None, None, None, Error(MissingToken)),
@@ -182,23 +137,6 @@ pub fn plan_from_bundle_output_uses_its_outdir_test() {
   assert plan.artifact_dir == "./build-output"
 }
 
-// The deploy-key route's refusals are plain text that already names the
-// limit, so they must not be wrapped in a status line.
-pub fn refused_deploys_show_the_server_message_test() {
-  assert deploy.describe_error(ApiError(
-      413,
-      "Too many files: a deploy can contain at most 5000 files",
-    ))
-    == "Too many files: a deploy can contain at most 5000 files"
-  assert deploy.describe_error(ApiError(400, "Nothing to deploy"))
-    == "Nothing to deploy"
-}
-
-pub fn other_api_failures_keep_their_status_test() {
-  assert deploy.describe_error(ApiError(502, "Deployment failed"))
-    == "Giolt API request failed with status 502: Deployment failed"
-}
-
 pub fn describe_error_missing_token_test() {
   let message = deploy.describe_error(MissingToken)
 
@@ -209,13 +147,6 @@ pub fn describe_error_missing_token_test() {
 pub fn describe_error_no_project_test() {
   assert deploy.describe_error(NoProject)
     == "No project to deploy to. Run `giolt link <name>` or pass `--project <name>`."
-}
-
-pub fn describe_error_name_needs_user_token_test() {
-  let message = deploy.describe_error(NameNeedsUserToken("blog"))
-
-  assert string.contains(message, "`blog`")
-  assert string.contains(message, "giolt link")
 }
 
 pub fn describe_error_prints_the_api_message_test() {

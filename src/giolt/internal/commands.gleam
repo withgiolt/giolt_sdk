@@ -451,16 +451,15 @@ fn login_with_token(
   api_url: String,
   token: String,
 ) -> Promise(Result(Nil, String)) {
-  case credentials.token_kind(token) {
-    credentials.UserToken -> {
+  case credentials.is_api_token(token) {
+    True -> {
       use previous <- promise.try_await(verify_and_store(api_url, token))
       revoke_previous(previous, token)
     }
-    credentials.DeployKey ->
+    False ->
       promise.resolve(Error(
-        "That is a deploy key, which can only deploy its one project. "
-        <> "`giolt login --token` needs a user token, which starts with "
-        <> "`giolt_`. Deploy keys go in `GIOLT_TOKEN` for `giolt deploy`.",
+        "That is not an API token. Tokens start with `giolt_` and are made "
+        <> "on the dashboard's Tokens page.",
       ))
   }
 }
@@ -766,9 +765,7 @@ fn open_session() -> Result(Session, String) {
 
   // An unreadable file only matters when there is no GIOLT_TOKEN to use.
   case resolved, stored {
-    Ok(session), _ ->
-      credentials.require_user_token(session)
-      |> result.map_error(credentials.describe_error)
+    Ok(session), _ -> Ok(session)
     Error(_), Error(unreadable) -> Error(credentials.describe_error(unreadable))
     Error(missing), Ok(_) -> Error(credentials.describe_error(missing))
   }

@@ -30,14 +30,8 @@ pub type Session {
   Session(token: String, api_url: String, source: Source)
 }
 
-pub type TokenKind {
-  UserToken
-  DeployKey
-}
-
 pub type Error {
   NotLoggedIn
-  NeedsUserToken(source: Source)
   UnreadableFile(path: String)
   CannotWrite(path: String)
   CannotDelete(path: String)
@@ -47,7 +41,7 @@ pub const token_env = "GIOLT_TOKEN"
 
 pub const api_url_env = "GIOLT_API_URL"
 
-const user_token_prefix = "giolt_"
+const token_prefix = "giolt_"
 
 pub fn environment() -> Environment {
   Environment(
@@ -103,13 +97,6 @@ pub fn api_url(env_api_url: Option(String)) -> String {
   non_empty(env_api_url) |> option.unwrap(config.default_api_url)
 }
 
-pub fn require_user_token(session: Session) -> Result(Session, Error) {
-  case token_kind(session.token) {
-    UserToken -> Ok(session)
-    DeployKey -> Error(NeedsUserToken(session.source))
-  }
-}
-
 fn non_empty(value: Option(String)) -> Option(String) {
   case value {
     Some("") -> None
@@ -117,11 +104,8 @@ fn non_empty(value: Option(String)) -> Option(String) {
   }
 }
 
-pub fn token_kind(token: String) -> TokenKind {
-  case string.starts_with(token, user_token_prefix) {
-    True -> UserToken
-    False -> DeployKey
-  }
+pub fn is_api_token(token: String) -> Bool {
+  string.starts_with(token, token_prefix)
 }
 
 pub fn encode_credential(credential: Credential) -> String {
@@ -179,17 +163,6 @@ pub fn describe_error(error: Error) -> String {
   case error {
     NotLoggedIn ->
       "Not logged in. Run `giolt login`, or set `" <> token_env <> "`."
-    NeedsUserToken(FromEnv) ->
-      "`"
-      <> token_env
-      <> "` holds a project deploy key, which can only deploy its one project. "
-      <> "This command needs a user token: unset `"
-      <> token_env
-      <> "` and run `giolt login`, or set it to a token from the dashboard's "
-      <> "Tokens page."
-    NeedsUserToken(FromFile) ->
-      "The stored token is a project deploy key, which can only deploy its one "
-      <> "project. Run `giolt login` to replace it with a user token."
     UnreadableFile(path) ->
       "Could not read the stored login in "
       <> path

@@ -44,13 +44,11 @@ are. They write to the `--config` file when you pass one.
 
 `deploy` picks its project and token like this:
 
-- `--project NAME` wins over the linked `project`. A name needs a user token to
-  look up.
+- `--project NAME` wins over the linked `project`. The CLI looks the name up with
+  your token.
 - The token is `GIOLT_TOKEN` when set, otherwise the one `giolt login` stored.
-- With a project, `deploy` uploads to that project. A deploy key in
-  `GIOLT_TOKEN` can deploy its own linked project.
-- With no project and a deploy key in `GIOLT_TOKEN`, `deploy` works as before:
-  the key names the project.
+- With no project, `deploy` stops and asks you to run `giolt link` or pass
+  `--project`. Tokens cover the whole account, so none of them names a project.
 - `GIOLT_TOKEN` goes to `GIOLT_API_URL`, then `api_url`. A stored login only
   goes to the URL it logged in against.
 
@@ -59,7 +57,7 @@ are. They write to the `--config` file when you pass one.
 | Command | Does |
 | --- | --- |
 | `giolt login` | Shows a code and opens the dashboard so you can approve it in the browser, then stores the token |
-| `giolt login --token -` | Reads a token made on the dashboard's Tokens page from stdin and stores it. It starts with `giolt_`; deploy keys are refused. `--token TOKEN` also works, but leaves the token in your shell history |
+| `giolt login --token -` | Reads a token made on the dashboard's Tokens page from stdin and stores it. It starts with `giolt_`; anything else is refused. `--token TOKEN` also works, but leaves the token in your shell history |
 | `giolt logout` | Revokes the stored token and deletes it. If the revoke fails, the file is still deleted and you are told to revoke the token on the dashboard |
 | `giolt whoami` | Shows the account email, the token's name, scopes and expiry, and where the token came from |
 | `giolt projects` | Lists your projects with their URL and latest deployment status |
@@ -83,8 +81,7 @@ pbpaste | gleam run -m giolt login --token -
 Logging in again revokes the token it replaces.
 
 `GIOLT_TOKEN` takes precedence over the stored token, so CI can set it without
-logging in. These commands need a user token, so a deploy key in `GIOLT_TOKEN`
-is refused. They never read `gleam.toml`, so a project's `api_url` cannot send
+logging in. Account commands never read `gleam.toml`, so a project's `api_url` cannot send
 your token elsewhere:
 
 - `giolt login` uses `GIOLT_API_URL`, or `https://dash.giolt.com` when that is

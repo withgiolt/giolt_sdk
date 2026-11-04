@@ -1,9 +1,7 @@
 import giolt/internal/credentials.{
-  Credential, DeployKey, Environment, FromEnv, FromFile, NeedsUserToken,
-  NotLoggedIn, Session, UserToken,
+  Credential, Environment, FromEnv, FromFile, NotLoggedIn, Session,
 }
 import gleam/option.{None, Some}
-import gleam/string
 
 const stored =
   Credential(token: "giolt_stored", api_url: "http://localhost:8787")
@@ -107,20 +105,6 @@ pub fn login_uses_giolt_api_url_or_the_default_test() {
   assert credentials.api_url(None) == "https://dash.giolt.com"
 }
 
-pub fn account_commands_refuse_a_deploy_key_test() {
-  let key = "2f1c7c8e-4b1a-4f7e-9d7a-0c5b1e2a3f4d"
-  let user = Session(token: "giolt_x", api_url: "u", source: FromEnv)
-  let deploy = Session(token: key, api_url: "u", source: FromEnv)
-
-  assert credentials.require_user_token(user) == Ok(user)
-  assert credentials.require_user_token(deploy)
-    == Error(NeedsUserToken(FromEnv))
-  assert string.contains(
-    credentials.describe_error(NeedsUserToken(FromEnv)),
-    "deploy key",
-  )
-}
-
 pub fn a_credential_round_trips_through_json_test() {
   assert credentials.decode_credential(credentials.encode_credential(stored))
     == Ok(stored)
@@ -133,9 +117,9 @@ pub fn a_corrupt_file_does_not_decode_test() {
   assert credentials.decode_credential("{\"api_url\":\"x\"}") == Error(Nil)
 }
 
-pub fn user_tokens_are_told_apart_from_deploy_keys_test() {
-  assert credentials.token_kind("giolt_ABCDEF234567") == UserToken
-  assert credentials.token_kind("2f1c7c8e-4b1a-4f7e-9d7a-0c5b1e2a3f4d")
-    == DeployKey
-  assert credentials.token_kind("GIOLT_abc") == DeployKey
+pub fn only_giolt_prefixed_values_are_api_tokens_test() {
+  assert credentials.is_api_token("giolt_ABCDEF234567")
+  assert !credentials.is_api_token("2f1c7c8e-4b1a-4f7e-9d7a-0c5b1e2a3f4d")
+  assert !credentials.is_api_token("GIOLT_abc")
+  assert !credentials.is_api_token("")
 }

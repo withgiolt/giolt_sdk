@@ -159,7 +159,7 @@ fn login_command() -> clip.Command(Command) {
   clip.command(fn(token) { Login(token: option.from_result(token)) })
   |> clip.opt(
     opt.new("token")
-    |> opt.help("A user token from the dashboard, or - to read it from stdin")
+    |> opt.help("A token from the dashboard, or - to read it from stdin")
     |> opt.optional,
   )
   |> clip.help(help.simple(
