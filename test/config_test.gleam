@@ -289,3 +289,18 @@ pub fn missing_artifact_mentions_prebuild_only_when_configured_test() {
   assert config.describe_missing_artifact("site", None)
     == "No such artifact directory: site. Create it first."
 }
+
+// Git on Windows checks files out with CRLF, and the TOML parser otherwise
+// lets a comment swallow every key after it.
+pub fn crlf_files_keep_the_keys_after_a_comment_test() {
+  let source = "name = \"app\"\r\ntarget = \"javascript\"\r\n"
+  let settings = "# a comment\r\n[tools.giolt]\r\nport = 3001\r\n"
+  let gleam_toml =
+    "name = \"app\"\r\n# a comment\r\n[tools.giolt]\r\nport = 3002\r\n"
+
+  let assert Ok(from_settings) = config.parse_with(source, Some(settings))
+  let assert Ok(from_gleam_toml) = config.parse(gleam_toml)
+
+  assert from_settings.port == 3001
+  assert from_gleam_toml.port == 3002
+}

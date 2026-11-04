@@ -77,6 +77,13 @@ pub fn split_byte_order_mark(source: String) -> #(String, String) {
   }
 }
 
+// The TOML parser lets a comment on a CRLF file run to the end of the input,
+// so every key after it is silently dropped and the defaults apply. Git on
+// Windows checks files out with CRLF, so this is the common case there.
+pub fn normalize_newlines(source: String) -> String {
+  string.replace(source, "\r\n", "\n")
+}
+
 pub fn parse(source: String) -> Result(Config, Error) {
   parse_with(source, None)
 }
@@ -86,11 +93,13 @@ pub fn parse_with(
   settings: Option(String),
 ) -> Result(Config, Error) {
   let #(_, source) = split_byte_order_mark(source)
-  use root <- result.try(tom.parse(source) |> result.replace_error(InvalidToml))
+  use root <- result.try(
+    tom.parse(normalize_newlines(source)) |> result.replace_error(InvalidToml),
+  )
   use toml <- result.try(case settings {
     None -> Ok(root)
     Some(text) ->
-      tom.parse(split_byte_order_mark(text).1)
+      tom.parse(normalize_newlines(split_byte_order_mark(text).1))
       |> result.replace_error(InvalidSettingsToml)
   })
   use package <- result.try(

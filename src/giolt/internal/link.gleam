@@ -60,7 +60,9 @@ fn remove_project_in(source: String) -> Result(String, Nil) {
 }
 
 fn linked_project(text: String) -> Result(Option(Int), Nil) {
-  use toml <- result.try(tom.parse(text) |> result.replace_error(Nil))
+  use toml <- result.try(
+    tom.parse(config.normalize_newlines(text)) |> result.replace_error(Nil),
+  )
   case tom.get_int(toml, ["tools", "giolt", "project"]) {
     Ok(id) -> Ok(Some(id))
     Error(tom.NotFound(_)) -> Ok(None)

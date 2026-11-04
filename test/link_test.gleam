@@ -1,5 +1,15 @@
 import giolt/internal/link
 
+pub fn edits_a_crlf_file_with_a_comment_before_the_table_test() {
+  let source =
+    "name = \"app\"\r\n# where CI deploys\r\n[tools.giolt]\r\nartifact = \"./site\"\r\n"
+
+  let assert Ok(linked) = link.set_project(source, 42)
+  assert linked
+    == "name = \"app\"\r\n# where CI deploys\r\n[tools.giolt]\r\nproject = 42\r\nartifact = \"./site\"\r\n"
+  assert link.remove_project(linked) == Ok(source)
+}
+
 // PowerShell 5 saves UTF-8 with a byte-order mark. The file is read and
 // written back with it, so the editor that wrote it still opens it the same.
 pub fn edits_a_file_that_starts_with_a_byte_order_mark_test() {
