@@ -34,6 +34,12 @@ export default {
 };
 "
 
+// The specifier lands inside JS string literals. A Windows path such as
+// `C:\Users\me` would otherwise lose its backslashes to escape sequences.
 pub fn render(specifier: String) -> String {
-  string.replace(template, "{entry}", specifier)
+  let literal =
+    specifier
+    |> string.replace("\\", "\\\\")
+    |> string.replace("\"", "\\\"")
+  string.replace(template, "{entry}", literal)
 }

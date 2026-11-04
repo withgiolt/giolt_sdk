@@ -60,3 +60,18 @@ pub fn render_has_no_handler_fallback_test() {
 
   assert !string.contains(rendered, "app.handler")
 }
+
+pub fn render_escapes_windows_path_backslashes_test() {
+  let rendered = shim.render("C:\\Users\\me\\app\\app.mjs")
+
+  assert string.contains(
+    rendered,
+    "import * as app from \"C:\\\\Users\\\\me\\\\app\\\\app.mjs\";",
+  )
+}
+
+pub fn render_escapes_quotes_in_path_test() {
+  let rendered = shim.render("/home/we\"ird/app.mjs")
+
+  assert string.contains(rendered, "from \"/home/we\\\"ird/app.mjs\";")
+}
